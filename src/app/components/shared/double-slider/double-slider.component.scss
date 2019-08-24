@@ -1,0 +1,75 @@
+@import '../../../../styles';
+
+$height: 70px;
+$width: 300px;
+$slider-size: 40px;
+
+.container {
+  width: $width;
+  height: $height;
+
+  position: relative;
+
+  margin: $slider-size / 2 auto 0 auto;
+
+  label {
+    display: none;
+  }
+
+  input[type='range'] {
+    width: 100%;
+    position: absolute;
+    left: 0;
+
+    -webkit-appearance: none;
+    outline: none;
+
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+
+      height: $slider-size;
+      width: $slider-size;
+      border-radius: 1000px;
+
+      background-color: $light-color;
+      transform-origin: center center;
+      transform: translateY(-$slider-size / 2 + $line-height / 2);
+
+      transition: box-shadow $long-animation-time, transform $long-animation-time;
+
+      &:hover {
+        box-shadow: $shadow;
+        transform: translateY(-$slider-size / 2 + $line-height / 2) scale(1.1);
+      }
+
+      cursor: pointer;
+
+      position: relative;
+      z-index: 2;
+    }
+
+    &::-webkit-slider-runnable-track {
+      -webkit-appearance: none;
+
+      width: 100%;
+      height: $line-height;
+      background-color: $text-color;
+      border-radius: 1000px;
+    }
+
+    &::-moz-focus-outer {
+      border: 0;
+    }
+  }
+
+  .value-container {
+    @include small-text();
+    display: flex;
+    justify-content: space-evenly;
+
+    span {
+      display: block;
+      margin-top: 10px;
+    }
+  }
+}

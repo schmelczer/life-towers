@@ -1,0 +1,9 @@
+@mixin inner-spacing($spacing, $horizontal: false) {
+  & > *:not(:last-child) {
+    @if $horizontal {
+      margin-right: $spacing;
+    } @else {
+      margin-bottom: $spacing;
+    }
+  }
+}

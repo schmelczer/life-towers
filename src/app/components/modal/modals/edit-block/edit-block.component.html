@@ -1,0 +1,33 @@
+<div class="header">
+  <div class="exit" (click)="modalService.cancel()"></div>
+  <h1>View item</h1>
+</div>
+
+<div class="select-add-container">
+  <!-- wrapper for easier styling -->
+  <app-select-add
+    class="select"
+    [options]="modalService.active.input.options"
+    [default]="modalService.active.input.options[0]"
+    [alwaysDropShadow]="true"
+    [onlyShadowBorder]="true"
+    [placeholder]="'Tag this item…'"
+    (value)="selected = $event"
+  ></app-select-add>
+</div>
+<!-- wrapper for easier styling -->
+
+<textarea placeholder="Write a description here…" [(ngModel)]="modalService.active.input.description"></textarea>
+
+<div>
+  <!-- wrapper for easier styling -->
+  <app-toggle
+    [beforeText]="'This task hasn\'t been finished yet'"
+    [afterText]="'Goal already accomplished'"
+    [default]="modalService.active.input.isDone"
+    (value)="modalService.active.input.isDone = $event"
+  ></app-toggle>
+</div>
+<!-- wrapper for easier styling -->
+
+<button (click)="submit()">Modify</button>

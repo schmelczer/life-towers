@@ -1,0 +1,66 @@
+@import '../../../../styles';
+
+:host {
+  $size: 30px;
+
+  @include center-child();
+  @include inner-spacing(var(--medium-padding), $horizontal: true);
+
+  span {
+    @include medium-text();
+    max-width: 3 * $size;
+
+    cursor: pointer;
+
+    &.active {
+      font-weight: bold;
+    }
+
+    &:first-of-type {
+      text-align: right;
+    }
+    &:last-of-type {
+      text-align: left;
+    }
+  }
+
+  input[type='checkbox'] {
+    -webkit-appearance: none;
+
+    width: 2 * $size;
+    height: $size;
+
+    border-radius: 1000px;
+    box-shadow: $shadow-border;
+
+    position: relative;
+    cursor: pointer;
+
+    &:after {
+      content: '';
+      position: absolute;
+      display: block;
+      left: 0;
+
+      @include square($size);
+
+      border-radius: 1000px;
+      background-color: $text-color;
+
+      transition: box-shadow $long-animation-time, left $long-animation-time, transform $long-animation-time;
+    }
+
+    &:hover:after {
+      box-shadow: $shadow;
+      transform: translateX(2px);
+    }
+
+    &.on:hover:after {
+      transform: translateX(-2px);
+    }
+
+    &.on:after {
+      left: $size;
+    }
+  }
+}

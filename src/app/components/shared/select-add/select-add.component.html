@@ -1,0 +1,27 @@
+<div class="select-add {{ onlyShadowBorder ? 'shadow-border' : '' }}">
+  <div #top class="top" (click)="toggle()">
+    <p [innerHTML]="selected ? selected : placeholder"></p>
+    <img src="assets/arrow.svg" [className]="isOpen ? 'upside-down' : ''" alt="arrow" />
+  </div>
+
+  <div class="bottom-container">
+    <div #bottom class="bottom {{ isOpen ? 'open' : '' }}">
+      <p *ngFor="let option of otherOptions" [innerHTML]="option" (click)="select(option)"></p>
+
+      <input
+        type="text"
+        *ngIf="options.length <= maxItemCount"
+        placeholder="Add a value…"
+        [(ngModel)]="newOption"
+        (keyup)="handleKeys($event)"
+      />
+
+      <button *ngIf="options.length <= maxItemCount" (click)="addNewOption()">Add</button>
+    </div>
+  </div>
+
+  <div
+    class="background {{ isOpen || alwaysDropShadow ? 'active' : '' }}"
+    [ngStyle]="{ height: backgroundHeight }"
+  ></div>
+</div>

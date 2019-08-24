@@ -1,0 +1,21 @@
+@import '../../../styles';
+
+:host {
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  @include inner-spacing(var(--large-padding));
+
+  .select-add-container {
+    width: 250px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .page-container {
+    flex: 1 0 auto;
+  }
+}

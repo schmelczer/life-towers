@@ -1,0 +1,117 @@
+@import '../../../../styles';
+
+$inner-padding: var(--medium-padding);
+.select-add {
+  width: 100%;
+  position: relative;
+
+  .top,
+  .bottom {
+    padding: $inner-padding;
+    z-index: 4;
+  }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    position: relative;
+    cursor: pointer;
+
+    p {
+      display: inline-block;
+      @include sub-title-text();
+    }
+
+    img {
+      @include square(16px);
+      transition: transform $long-animation-time;
+
+      &.upside-down {
+        transform: rotate(-180deg);
+      }
+    }
+  }
+
+  .bottom-container {
+    width: 100%;
+    height: 40vh;
+
+    position: absolute;
+    overflow-y: hidden;
+    pointer-events: none;
+
+    .bottom {
+      position: absolute;
+      width: 100%;
+
+      pointer-events: all;
+      box-sizing: border-box;
+
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+
+      border-radius: 0 0 var(--border-radius) var(--border-radius);
+
+      padding-top: 0;
+
+      @include inner-spacing($inner-padding);
+
+      transform: translateY(-100%);
+      visibility: hidden;
+
+      &.open {
+        visibility: visible;
+        transform: none;
+      }
+
+      transition: transform $long-animation-time;
+
+      p {
+        @include sub-title-text();
+
+        display: inline-block;
+        text-align: left;
+
+        cursor: pointer;
+      }
+    }
+  }
+
+  .background {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 100%;
+
+    @include card();
+
+    z-index: 3;
+
+    transition: box-shadow $long-animation-time, height $long-animation-time;
+
+    &.active {
+      box-shadow: $shadow;
+    }
+  }
+
+  &:hover {
+    .background {
+      box-shadow: $shadow;
+    }
+  }
+
+  &.shadow-border {
+    .background.active {
+      box-shadow: $shadow-border;
+    }
+  }
+
+  &.shadow-border:hover {
+    .background {
+      box-shadow: $shadow-border;
+    }
+  }
+}

@@ -1,0 +1,16 @@
+<section>
+  <div class="header">
+    <div class="exit" (click)="modalService.cancel()"></div>
+    <h1>Are you sure?</h1>
+  </div>
+
+  <p>
+    You are trying to remove
+    <span [ngStyle]="{ color: modalService.active.input.baseColor.toString() }">{{
+      modalService.active.input.name ? modalService.active.input.name : 'an unnamed tower'
+    }}</span
+    >.
+  </p>
+
+  <button (click)="modalService.submit()">Remove</button>
+</section>

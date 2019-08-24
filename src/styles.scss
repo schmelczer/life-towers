@@ -1,1 +1,35 @@
-/* You can add global styles to this file, and also import other style files */
+@import 'library/main';
+
+$line-height: 2px;
+
+* {
+  margin: 0;
+  padding: 0;
+
+  &:active,
+  &:focus {
+    outline: 0;
+  }
+
+  &::selection {
+    background: $text-color;
+    color: $light-color;
+  }
+
+  &::placeholder {
+    user-select: none;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  background: $background-gradient;
+}
+
+body {
+  text-align: center;
+  padding: var(--large-padding);
+  box-sizing: border-box;
+  position: relative;
+}

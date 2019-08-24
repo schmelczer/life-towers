@@ -1,0 +1,53 @@
+@import '../../../../../../styles';
+
+:host {
+  width: 100%;
+  box-sizing: border-box;
+
+  .container {
+    @include card();
+    box-shadow: $shadow-border;
+    padding: var(--small-padding);
+    margin: var(--small-padding);
+
+    max-height: 30vh;
+    overflow-y: auto;
+
+    .header {
+      cursor: pointer;
+    }
+
+    p {
+      width: 100%;
+      font-size: var(--medium-font-size);
+    }
+
+    .all-task {
+      @include inner-spacing(var(--small-padding));
+
+      :first-child {
+        margin-top: var(--small-padding);
+      }
+
+      width: 100%;
+      box-sizing: border-box;
+
+      overflow-y: hidden;
+
+      height: 0;
+      transition: height $long-animation-time;
+
+      p {
+        max-width: 60px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow-x: hidden;
+        text-align: left;
+
+        &:hover {
+          font-weight: bold;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+<div class="tower">
+  <div class="container">
+    <div class="tasks-container">
+      <app-tasks [tasks]="tasks" [tower]="tower"></app-tasks>
+    </div>
+
+    <img src="assets/plus-sign.svg" alt="add item" (click)="addBlock()" />
+
+    <div class="block-container {{ isFalling ? 'falling' : '' }}">
+      <app-block *ngFor="let block of drawableBlocks" [block]="block" [tower]="tower"></app-block>
+    </div>
+  </div>
+
+  <label for="tower-name" class="hidden">Card name</label>
+  <input
+    id="tower-name"
+    type="text"
+    placeholder="…"
+    [(ngModel)]="tower.name"
+    [ngStyle]="{ color: tower.baseColor.toString() }"
+  />
+</div>

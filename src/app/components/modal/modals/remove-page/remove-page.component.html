@@ -1,0 +1,13 @@
+<section>
+  <div class="header">
+    <div class="exit" (click)="modalService.cancel()"></div>
+    <h1>Are you sure?</h1>
+  </div>
+
+  <p>
+    You are trying to remove <strong>{{ this.modalService.active.input }}</strong
+    >.
+  </p>
+
+  <button (click)="modalService.submit()">Remove</button>
+</section>

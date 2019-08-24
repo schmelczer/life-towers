@@ -1,0 +1,53 @@
+@import '../../../../styles';
+
+:host {
+  display: flex;
+  flex-direction: column;
+
+  height: 100%;
+
+  @include inner-spacing(var(--large-padding));
+
+  button {
+    margin-top: 0;
+  }
+
+  .towers {
+    display: flex;
+    justify-content: center;
+
+    width: 100%;
+
+    flex: 1 0 auto;
+
+    transition: box-shadow $short-animation-time;
+
+    &.cdk-drop-list-dragging {
+      *:not(.cdk-drag-placeholder) {
+        transition: transform $long-animation-time cubic-bezier(0, 0, 0.2, 1);
+      }
+    }
+
+    @include inner-spacing(var(--medium-padding), $horizontal: true);
+  }
+
+  .double-slider-container {
+    @media (max-height: $min-height) {
+      display: none;
+    }
+  }
+
+  img {
+    @include square(47.33333px);
+    padding: 47.3333px 0;
+    margin: auto;
+
+    position: relative;
+    z-index: 1500;
+
+    transition: transform $long-animation-time;
+    &:hover {
+      transform: scale(1.2);
+    }
+  }
+}

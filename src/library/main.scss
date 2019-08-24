@@ -1,0 +1,62 @@
+@import 'common-variables';
+@import 'animations';
+@import 'text';
+@import 'spacing';
+@import 'forms';
+@import 'utils';
+
+:root {
+  --border-radius: 5px;
+
+  --large-padding: 30px;
+  --medium-padding: 15px;
+  --small-padding: 10px;
+
+  @media (max-width: $mobile-width) {
+    --border-radius: 3px;
+
+    --large-padding: 20px;
+    --medium-padding: 15px;
+    --small-padding: 7.5px;
+  }
+}
+
+@mixin card {
+  border-radius: var(--border-radius);
+  background-color: $light-color;
+}
+
+@mixin center-child {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@mixin exit {
+  @include square(16px);
+  background: url('/assets/x-sign.svg') no-repeat center center;
+  background-size: 50% 50%;
+  box-sizing: content-box;
+  padding: 8px;
+
+  @include jump();
+}
+
+img {
+  user-select: none;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  box-shadow: $shadow-border;
+  border-radius: var(--border-radius);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: $text-color;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}

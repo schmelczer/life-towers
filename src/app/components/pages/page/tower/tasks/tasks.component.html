@@ -1,0 +1,16 @@
+<div class="container">
+  <p class="header" (click)="isOpen = !isOpen">
+    {{ tasks.length == 0 ? 'no' : '' }}
+    <strong>
+      {{ tasks.length == 0 ? '' : tasks.length }}
+    </strong>
+    {{ tasks.length == 1 ? 'task' : 'tasks' }}
+  </p>
+  <div class="all-task" #allTask [ngStyle]="{ height: (isOpen ? allTask?.scrollHeight : 0) + 'px' }">
+    <p
+      *ngFor="let task of tasks"
+      (click)="handleClick(task)"
+      [innerText]="task.description ? task.description : 'unknown'"
+    ></p>
+  </div>
+</div>

@@ -1,0 +1,18 @@
+<div class="select-add-container">
+  <!-- wrapper for easier styling -->
+  <app-select-add
+    [options]="dataService.pageNames"
+    [default]="dataService.active?.name"
+    (value)="selectPage($event)"
+    [placeholder]="'Add a new page…'"
+  ></app-select-add>
+</div>
+<!-- wrapper for easier styling -->
+
+<div class="page-container">
+  <!-- wrapper for easier styling -->
+  <app-page *ngIf="dataService.active !== null" [page]="dataService.active"></app-page>
+</div>
+<!-- wrapper for easier styling -->
+
+<button (click)="openSettings()">Settings</button>

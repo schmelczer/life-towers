@@ -1,0 +1,13 @@
+<div class="container">
+  <label for="date-selector-1">date selector 1</label>
+  <label for="date-selector-2">date selector 2</label>
+  <input id="date-selector-1" type="range" min="0" [max]="MAX - 1" [(ngModel)]="oneValue" />
+  <input id="date-selector-2" type="range" min="0" [max]="MAX - 1" [(ngModel)]="otherValue" />
+  <div class="value-container">
+    <span
+      *ngFor="let i of drawnLabelsIndices"
+      [innerHTML]="drawnLabels[i]"
+      [ngStyle]="{ transform: getOffset(i) }"
+    ></span>
+  </div>
+</div>

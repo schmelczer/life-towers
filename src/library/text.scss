@@ -1,0 +1,57 @@
+@import 'common-variables';
+
+:root {
+  --larger-font-size: 22px;
+  --large-font-size: 18px;
+  --medium-font-size: 16px;
+  --small-font-size: 11px;
+
+  @media (max-width: $mobile-width) {
+    --larger-font-size: 20px;
+    --large-font-size: 16px;
+    --medium-font-size: 14px;
+    --small-font-size: 10px;
+  }
+}
+
+@mixin title-text {
+  font-family: $title-font;
+  color: $text-color;
+  font-size: var(--larger-font-size);
+  user-select: none;
+}
+
+@mixin sub-title-text {
+  font-family: $title-font;
+  color: $text-color;
+  font-size: var(--medium-font-size);
+  user-select: none;
+}
+
+@mixin normal-text {
+  font-family: $normal-font;
+  color: $text-color;
+  font-size: var(--larger-font-size);
+}
+
+@mixin medium-text {
+  font-family: $normal-font;
+  color: $text-color;
+  font-size: var(--medium-font-size);
+}
+
+@mixin small-text {
+  font-family: $normal-font;
+  color: $text-color;
+  font-size: var(--small-font-size);
+}
+
+h1,
+h2,
+h3 {
+  @include title-text();
+}
+
+p {
+  @include normal-text();
+}

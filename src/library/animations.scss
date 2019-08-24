@@ -1,0 +1,22 @@
+@import 'common-variables';
+
+$long-animation-time: 200ms;
+$short-animation-time: 100ms;
+
+@mixin gravitate {
+  cursor: pointer;
+  transition: box-shadow $long-animation-time, transform $long-animation-time;
+
+  &:hover {
+    box-shadow: $shadow;
+    transform: scale(1.1);
+  }
+}
+
+@mixin jump {
+  cursor: pointer;
+  transition: transform $long-animation-time;
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
