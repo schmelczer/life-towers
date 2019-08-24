@@ -63,6 +63,7 @@
             "production": {
               "browserTarget": "frontend:build:production"
             }
+
           }
         },
         "extract-i18n": {

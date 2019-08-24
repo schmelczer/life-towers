@@ -28,6 +28,7 @@ export class TasksComponent implements OnInit {
         description: block.description,
         isDone: block.isDone
       });
+
       block.tag = selected;
       block.description = description;
       if (!block.isDone && isDone) {
