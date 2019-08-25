@@ -1,16 +1,14 @@
-<div class="container">
+<div class="container {{ tasks.length > 0 ? 'show-hover' : '' }}">
   <p class="header" (click)="isOpen = !isOpen">
-    {{ tasks.length == 0 ? 'no' : '' }}
     <strong>
       {{ tasks.length == 0 ? '' : tasks.length }}
     </strong>
-    {{ tasks.length == 1 ? 'task' : 'tasks' }}
+    {{ tasks.length == 0 ? '&#8203;' : tasks.length == 1 ? 'task' : 'tasks' }}
   </p>
   <div class="all-task" #allTask [ngStyle]="{ height: (isOpen ? allTask?.scrollHeight : 0) + 'px' }">
-    <p
-      *ngFor="let task of tasks"
-      (click)="handleClick(task)"
-      [innerText]="task.description ? task.description : 'unknown'"
-    ></p>
+    <div class="task-container" *ngFor="let task of tasks" [ngStyle]="{ color: task.color.toString() }">
+      <div [ngStyle]="{ 'background-color': task.color.toString() }"></div>
+      <p (click)="handleClick(task)" [innerText]="task.description ? task.description : 'unknown'"></p>
+    </div>
   </div>
 </div>

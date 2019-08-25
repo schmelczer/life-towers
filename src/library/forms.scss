@@ -43,10 +43,35 @@ button {
 
   background: transparent;
   border: 0;
-  text-decoration: underline;
 
   @include medium-text();
-  @include jump();
+  font-size: var(--large-font-size);
+  $height: 2px;
+  cursor: pointer;
+  border-bottom: solid $height #5d576b55;
+  position: relative;
+
+  &:disabled {
+    color: #5d576b55;
+    border-bottom: solid $height #5d576b33;
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    &:after {
+      width: 100%;
+    }
+  }
+  &:after {
+    content: '';
+    width: 0;
+    height: $height;
+    position: absolute;
+    left: 0;
+    bottom: calc(-1 * #{$height});
+    background-color: $text-color;
+    transition: width 300ms;
+  }
 }
 
 label {

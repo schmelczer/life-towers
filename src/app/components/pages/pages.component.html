@@ -11,8 +11,12 @@
 
 <div class="page-container">
   <!-- wrapper for easier styling -->
-  <app-page *ngIf="dataService.active !== null" [page]="dataService.active"></app-page>
+  <app-page
+    *ngIf="dataService.active !== null"
+    [page]="dataService.active"
+    (isDragHappening)="isDragHappening = $event"
+  ></app-page>
 </div>
 <!-- wrapper for easier styling -->
 
-<button (click)="openSettings()">Settings</button>
+<button [ngClass]="isDragHappening ? 'transparent' : ''" (click)="openSettings()">Settings</button>

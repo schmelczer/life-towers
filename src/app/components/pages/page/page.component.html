@@ -16,7 +16,7 @@
 </section>
 
 <img
-  *ngIf="isDragging"
+  [ngClass]="isDragging ? 'active' : ''"
   src="assets/trash.svg"
   alt="trashcan"
   (pointerenter)="trashEnter()"
@@ -24,9 +24,9 @@
   (pointerup)="removeTower()"
 />
 
-<div class="double-slider-container">
+<div class="double-slider-container" [ngStyle]="{ opacity: isDragging ? '0' : '1' }">
   <app-double-slider
-    *ngIf="!isDragging && dates.length >= MIN_BLOCK_COUNT_BEFORE_SHOWING_SLIDER"
+    *ngIf="dates.length >= MIN_BLOCK_COUNT_BEFORE_SHOWING_SLIDER"
     [values]="dates"
     [labels]="dateLabels"
     (lowerBound)="startDate = $event"

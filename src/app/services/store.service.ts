@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Page } from '../model/page';
 
-const LOCAL_STORAGE_KEY = 'life-towers.data.v.2.1';
+const LOCAL_STORAGE_KEY = 'life-towers.data.v.2';
 
 @Injectable({
   providedIn: 'root'

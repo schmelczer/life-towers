@@ -13,6 +13,8 @@ export class PagesComponent {
   @ViewChild('page') page: ElementRef;
   @ViewChild('bottom') bottom: ElementRef;
 
+  isDragHappening = false;
+
   constructor(public dataService: DataService, private modalService: ModalService) {}
 
   async selectPage(selected: string) {

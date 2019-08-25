@@ -2,6 +2,7 @@ import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
 import { Block } from '../../../../../model/block';
 import { Tower } from '../../../../../model/tower';
 import { ModalService } from '../../../../../services/modal.service';
+import { CancelService } from '../../../../../services/cancel.service';
 
 @Component({
   selector: 'app-tasks',
@@ -12,11 +13,25 @@ export class TasksComponent implements OnInit {
   @Input() tasks: Block[];
   @Input() tower: Tower;
 
-  @Input() isOpen = false;
+  private _isOpen = false;
+  @Input() set isOpen(value: boolean) {
+    if (value) {
+      this.cancelService.cancelAllExcept(this);
+    }
+    this._isOpen = value;
+  }
+
+  get isOpen(): boolean {
+    return this._isOpen;
+  }
 
   @ViewChild('allTask') allTask: ElementRef;
 
-  constructor(private modalService: ModalService) {}
+  constructor(private modalService: ModalService, private cancelService: CancelService) {
+    this.cancelService.subscribe(this, () => {
+      this.isOpen = false;
+    });
+  }
 
   ngOnInit() {}
 
@@ -36,6 +51,18 @@ export class TasksComponent implements OnInit {
       }
       block.isDone = isDone;
     } catch {
+      // pass
+    }
+  }
+
+  public async addTask() {
+    try {
+      const { selected: tag, description, isDone } = await this.modalService.showCreateBlock({
+        options: this.tower.tags,
+        isTask: true
+      });
+      this.tower.addBlock({ tag, description, isDone });
+    } catch (e) {
       // pass
     }
   }

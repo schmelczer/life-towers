@@ -60,3 +60,8 @@ img {
   border-radius: var(--border-radius);
   cursor: pointer;
 }
+
+* {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}

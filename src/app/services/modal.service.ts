@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Tower } from '../model/tower';
 import { top } from '../utils/top';
+import { CancelService } from './cancel.service';
 
 export enum ModalType {
   createBlock,
@@ -25,8 +26,13 @@ interface Modal {
 export class ModalService {
   private modalStack: Modal[] = [];
 
-  showCreateBlock(options: string[]): Promise<{ selected: string; description: string; isDone: boolean }> {
-    return this.createPromiseAndPushToStack(options, ModalType.createBlock);
+  constructor(private cancelService: CancelService) {}
+
+  showCreateBlock(input: {
+    options: string[];
+    isTask: boolean;
+  }): Promise<{ selected: string; description: string; isDone: boolean }> {
+    return this.createPromiseAndPushToStack(input, ModalType.createBlock);
   }
 
   showEditBlock(data: {
@@ -65,6 +71,8 @@ export class ModalService {
   }
 
   private createPromiseAndPushToStack(input: any, type: ModalType): Promise<any> {
+    this.cancelService.cancelAll();
+
     const modal = {
       input,
       type,

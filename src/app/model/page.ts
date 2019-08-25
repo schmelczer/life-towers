@@ -5,6 +5,11 @@ import { ITower } from '../interfaces/persistance/tower';
 
 export class Page extends Base implements IPage {
   constructor(props) {
+    // TODO: remove
+    if (!props.userData) {
+      props.userData = {};
+    }
+
     super(props);
     // @ts-ignore to prevent update message
     this.__towers = this.towers.map(t => this.createTower(t));
@@ -37,7 +42,6 @@ export class Page extends Base implements IPage {
     do {
       hue = Math.random() * 360;
     } while (30 <= hue && hue <= 200);
-    console.log(hue);
 
     this.towers.push(
       this.createTower({

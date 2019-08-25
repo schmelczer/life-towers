@@ -7,8 +7,8 @@
   <!-- wrapper for easier styling -->
   <app-select-add
     class="select"
-    [options]="modalService.active.input"
-    [default]="modalService.active.input[0]"
+    [options]="modalService.active.input.options"
+    [default]="modalService.active.input.options[0]"
     [alwaysDropShadow]="true"
     [onlyShadowBorder]="true"
     [placeholder]="'Tag this item…'"
@@ -24,10 +24,10 @@
   <app-toggle
     [beforeText]="'This task hasn\'t been finished yet'"
     [afterText]="'Goal already accomplished'"
-    [default]="false"
+    [default]="!modalService.active.input.isTask"
     (value)="isDone = $event"
   ></app-toggle>
 </div>
 <!-- wrapper for easier styling -->
 
-<button (click)="submit()">Create</button>
+<button (click)="submit()" [disabled]="!selected">Create</button>

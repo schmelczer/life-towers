@@ -1,14 +1,8 @@
-export const hashCode = (text: string) => {
-  let hash = 0;
-  if (text.length == 0) {
-    return hash;
+export const hash = (text: string): number => {
+  // Return number between 0 and 1.
+  if (!text) {
+    return 0;
   }
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-
-  hash /= Math.pow(2, 32) - 1;
-  return hash;
+  const hash = Array.prototype.reduce.call(text, (hash, char) => (hash << 5) - hash + char.charCodeAt(0), 7);
+  return hash / (Math.pow(2, 32) - 1);
 };

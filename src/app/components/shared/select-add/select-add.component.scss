@@ -98,8 +98,10 @@ $inner-padding: var(--medium-padding);
   }
 
   &:hover {
-    .background {
-      box-shadow: $shadow;
+    @media (min-width: $mobile-width) {
+      .background {
+        box-shadow: $shadow;
+      }
     }
   }
 

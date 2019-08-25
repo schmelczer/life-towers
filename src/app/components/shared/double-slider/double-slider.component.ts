@@ -16,6 +16,12 @@ export class DoubleSliderComponent {
 
     this._values = values;
     this.calculateLabels();
+    if (this._oneValue > this._otherValue) {
+      this._oneValue = this.MAX - 1;
+    } else {
+      this._otherValue = this.MAX - 1;
+    }
+
     this.emitValue();
   }
 

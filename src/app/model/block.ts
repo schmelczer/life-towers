@@ -4,6 +4,11 @@ import { Color } from './color';
 
 export class Block extends Base implements IBlock {
   constructor(props: IBlock) {
+    // TODO: remove
+    if (props.isDone === undefined) {
+      props.isDone = true;
+    }
+
     super(props);
 
     if (this.created.constructor.name !== 'Date') {

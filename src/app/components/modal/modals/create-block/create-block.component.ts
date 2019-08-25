@@ -14,6 +14,10 @@ export class CreateBlockComponent {
   constructor(public modalService: ModalService) {}
 
   submit() {
+    if (!this.selected) {
+      return;
+    }
+
     this.modalService.submit({
       selected: this.selected,
       description: this.description,

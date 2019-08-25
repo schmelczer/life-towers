@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Page } from '../../../model/page';
 import { ModalService } from '../../../services/modal.service';
 import { DataService } from '../../../services/data.service';
@@ -19,6 +19,8 @@ export class PageComponent {
     value.subscribe(() => this.updateDates());
     this.updateDates();
   }
+
+  @Output() isDragHappening: EventEmitter<boolean> = new EventEmitter();
 
   get page(): Page {
     return this._page;
@@ -59,11 +61,13 @@ export class PageComponent {
   dropDrag(event: any) {
     this.page.moveTower(event);
     this.isDragging = false;
+    this.isDragHappening.emit(false);
   }
 
   startDrag(id: number) {
     this.draggedTowerIndex = id;
     this.isDragging = true;
+    this.isDragHappening.emit(true);
   }
 
   trashEnter() {

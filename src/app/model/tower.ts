@@ -3,7 +3,7 @@ import { Color } from './color';
 import { Block } from './block';
 import { Base } from './base';
 import { IBlock } from '../interfaces/persistance/block';
-import { hashCode } from '../utils/hash';
+import { hash } from '../utils/hash';
 
 export class Tower extends Base implements ITower {
   constructor(props: ITower) {
@@ -46,7 +46,7 @@ export class Tower extends Base implements ITower {
       if (!this.tags.includes(block.tag)) {
         this.tags.push(block.tag);
       }
-      block.color = this.baseColor.lighten(hashCode(block.tag) * 50);
+      block.color = this.baseColor.lighten(hash(block.tag) * 50);
     }
 
     super.update();

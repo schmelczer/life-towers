@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { Component, Input } from '@angular/core';
 import { Tower } from '../../../../model/tower';
 import { ModalService } from '../../../../services/modal.service';
 import { Block } from '../../../../model/block';
@@ -40,7 +40,10 @@ export class TowerComponent {
 
   public async addBlock() {
     try {
-      const { selected: tag, description, isDone } = await this.modalService.showCreateBlock(this.tower.tags);
+      const { selected: tag, description, isDone } = await this.modalService.showCreateBlock({
+        options: this.tower.tags,
+        isTask: false
+      });
       this.tower.addBlock({ tag, description, isDone });
     } catch (e) {
       // pass

@@ -18,4 +18,12 @@
   .page-container {
     flex: 1 0 auto;
   }
+
+  button {
+    transition: opacity $long-animation-time;
+
+    &.transparent {
+      opacity: 0;
+    }
+  }
 }

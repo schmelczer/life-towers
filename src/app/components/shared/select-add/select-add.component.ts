@@ -1,4 +1,5 @@
 import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
+import { CancelService } from '../../../services/cancel.service';
 
 @Component({
   selector: 'app-select-add',
@@ -27,6 +28,12 @@ export class SelectAddComponent {
   selected: string;
   newOption: string;
   isOpen = false;
+
+  constructor(private cancelService: CancelService) {
+    this.cancelService.subscribe(this, () => {
+      this.isOpen = false;
+    });
+  }
 
   get otherOptions(): string[] {
     return this.options.filter(a => a !== this.selected);
