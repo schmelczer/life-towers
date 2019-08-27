@@ -50,13 +50,15 @@
       transition: box-shadow $long-animation-time, left $long-animation-time, transform $long-animation-time;
     }
 
-    &:hover:after {
-      box-shadow: $shadow;
-      transform: translateX(2px);
-    }
+    @media (min-width: $mobile-width) {
+      &:hover:after {
+        box-shadow: $shadow;
+        transform: translateX(2px);
+      }
 
-    &.on:hover:after {
-      transform: translateX(-2px);
+      &.on:hover:after {
+        transform: translateX(-2px);
+      }
     }
 
     &.on:after {

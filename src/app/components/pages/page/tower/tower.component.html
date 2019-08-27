@@ -6,8 +6,10 @@
 
     <img src="assets/plus-sign.svg" alt="add item" (click)="addBlock()" />
 
-    <div class="block-container {{ isFalling ? 'falling' : '' }}">
-      <app-block *ngFor="let block of drawableBlocks" [block]="block" [tower]="tower"></app-block>
+    <div class="block-container-container">
+      <div class="block-container falling">
+        <app-block *ngFor="let block of drawableBlocks" [block]="block" [tower]="tower"></app-block>
+      </div>
     </div>
   </div>
 

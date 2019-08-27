@@ -69,7 +69,7 @@
           text-align: left;
 
           @media (max-width: $mobile-width) {
-            font-size: var(--small-font-size);
+            font-size: calc(var(--small-font-size) / 2 + var(--medium-font-size) / 2);
           }
 
           position: relative;

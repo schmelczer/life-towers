@@ -29,7 +29,9 @@ export class TowerComponent {
   }
 
   get tasks(): Block[] {
-    return this.tower.blocks.filter(block => !block.isDone);
+    return this.tower.blocks.filter(
+      block => this.dateRange.from <= block.created && block.created <= this.dateRange.to && !block.isDone
+    );
   }
 
   @Input() tower: Tower;
