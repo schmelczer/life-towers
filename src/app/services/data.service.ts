@@ -1,4 +1,4 @@
-import { ApplicationRef, Injectable } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { StoreService } from './store.service';
 import { Page } from '../model/page';
 
@@ -22,7 +22,7 @@ export class DataService {
   private hasLoaded = new Promise(resolve => (this.afterLoadFinished = resolve));
   private afterLoadFinished: () => void;
 
-  constructor(private storeService: StoreService, private applicationRef: ApplicationRef) {
+  constructor(private storeService: StoreService) {
     this.init();
   }
 
@@ -72,7 +72,6 @@ export class DataService {
 
   private update() {
     this.subscribers.map(f => f());
-    this.applicationRef.tick();
   }
 
   private loadActiveIndex() {

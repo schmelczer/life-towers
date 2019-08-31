@@ -1,6 +1,10 @@
+import { Subject } from 'rxjs/internal/Subject';
+
 export class Base {
   private static propertyList: any = {};
   protected subscribers: (() => void)[] = [];
+
+  subject: Subject<this> = new Subject();
 
   constructor(properties: any) {
     const type = this.constructor.name;
@@ -37,7 +41,8 @@ export class Base {
         [property]: this[property],
         ...object
       }),
-      {}
+      // TODO
+      { type: this.constructor.name }
     );
   }
 
@@ -46,6 +51,7 @@ export class Base {
   }
 
   protected update() {
+    this.subject.next(this);
     this.subscribers.map(f => f());
   }
 }
