@@ -26,7 +26,7 @@ export abstract class InnerNode extends Node {
     return this.update((self: this) => this.cloneWithMap.call(self, map));
   }
 
-  changeKey(update: { value: any; propertyName: string }): this {
+  changeKey(update: { propertyName: string; value: any }): this {
     return this.update((self: this) => this.cloneWithAdd.call(self, update));
   }
 

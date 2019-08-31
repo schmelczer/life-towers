@@ -6,8 +6,8 @@
     {{ tasks.length == 0 ? '&#8203;' : tasks.length == 1 ? 'task' : 'tasks' }}
   </p>
   <div class="all-task" #allTask [ngStyle]="{ height: (isOpen ? allTask?.scrollHeight : 0) + 'px' }">
-    <div class="task-container" *ngFor="let task of tasks" [ngStyle]="{ color: task.color.toString() }">
-      <div [ngStyle]="{ 'background-color': task.color.toString() }"></div>
+    <div class="task-container" *ngFor="let task of tasks" [ngStyle]="{ color: toHslString(task.color) }">
+      <div [ngStyle]="{ 'background-color': toHslString(task.color) }"></div>
       <p (click)="handleClick(task)" [innerText]="task.description ? task.description : 'unknown'"></p>
     </div>
   </div>

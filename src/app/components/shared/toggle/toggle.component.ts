@@ -12,7 +12,7 @@ export class ToggleComponent {
   @Output() value: EventEmitter<boolean> = new EventEmitter();
 
   @Input() set default(value: boolean) {
-    this.on = value;
+    this._on = value;
   }
 
   private _on = false;

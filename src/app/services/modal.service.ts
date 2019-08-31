@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 import { Tower } from '../model/tower';
 import { top } from '../utils/top';
 import { CancelService } from './cancel.service';
+import { Page } from '../model/page';
+import { Observable } from 'rxjs/internal/Observable';
 
 export enum ModalType {
   createBlock,
@@ -44,8 +46,8 @@ export class ModalService {
     return this.createPromiseAndPushToStack(data, ModalType.editBlock);
   }
 
-  showSettings(): Promise<void> {
-    return this.createPromiseAndPushToStack(null, ModalType.settings);
+  showSettings(selectedPage: Observable<Page>): Promise<void> {
+    return this.createPromiseAndPushToStack(selectedPage, ModalType.settings);
   }
 
   showRemoveTower(tower: Tower): Promise<void> {

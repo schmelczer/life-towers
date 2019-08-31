@@ -2,6 +2,8 @@ import { Component, Input } from '@angular/core';
 import { Tower } from '../../../../model/tower';
 import { ModalService } from '../../../../services/modal.service';
 import { Block } from '../../../../model/block';
+import { IColor } from '../../../../interfaces/persistance/color';
+import { toHslString } from '../../../../utils/color';
 
 @Component({
   selector: 'app-tower',
@@ -9,6 +11,8 @@ import { Block } from '../../../../model/block';
   styleUrls: ['./tower.component.scss']
 })
 export class TowerComponent {
+  readonly toHslString = toHslString;
+
   @Input() set dateRange(value: { from: Date; to: Date }) {
     if (this.dateRange !== undefined && this.dateRange.from === value.from && this.dateRange.to === value.to) {
       return;
@@ -22,14 +26,14 @@ export class TowerComponent {
 
   public constructor(private modalService: ModalService) {}
 
-  get drawableBlocks(): Block[] {
-    return this.tower.blocks.filter(
+  get drawableBlocks(): Array<Block & { color: IColor }> {
+    return this.tower.coloredBlocks.filter(
       block => this.dateRange.from <= block.created && block.created <= this.dateRange.to && block.isDone
     );
   }
 
-  get tasks(): Block[] {
-    return this.tower.blocks.filter(
+  get tasks(): Array<Block & { color: IColor }> {
+    return this.tower.coloredBlocks.filter(
       block => this.dateRange.from <= block.created && block.created <= this.dateRange.to && !block.isDone
     );
   }

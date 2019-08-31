@@ -16,13 +16,22 @@ export class Root<T extends InnerNode> extends Node {
   }
 
   changeValue({ oldValue, newValue }: { oldValue: any; newValue: any }) {
-    if (this.children === oldValue) {
-      this.children = newValue;
-      for (let child of this.children) {
-        child.parent = this;
-      }
-    } else {
+    if (this.children !== oldValue) {
       throw new TypeError('Only children can be changed.');
+    }
+    this.children = newValue;
+    for (let child of this.children) {
+      child.parent = this;
+    }
+  }
+
+  changeKey({ propertyName, value }: { propertyName: string; value: any }) {
+    if (propertyName !== 'children') {
+      throw new TypeError('Only children can be changed.');
+    }
+    this.children = value;
+    for (let child of this.children) {
+      child.parent = this;
     }
   }
 }

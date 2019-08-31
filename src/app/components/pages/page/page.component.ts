@@ -16,7 +16,6 @@ export class PageComponent {
     }
 
     this._page = value;
-    value.subscribe(() => this.updateDates());
     this.updateDates();
   }
 
@@ -53,10 +52,6 @@ export class PageComponent {
   }
 
   constructor(private modalService: ModalService, public dataService: DataService) {}
-
-  createTower() {
-    this.page.addTower();
-  }
 
   dropDrag(event: any) {
     this.page.moveTower(event);

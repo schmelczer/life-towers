@@ -2,22 +2,9 @@ import { InnerNode } from './inner-node';
 import { Node } from './node';
 
 export class Cloneable extends InnerNode {
-  name;
-  constructor(parent: Node, name: any) {
+  constructor(parent: Node) {
     super(parent);
-    this.name = name;
   }
-
-  changeNameMap = (newValue: string) => {
-    this.name = newValue;
-  };
-
-  changeName = (newValue: any) => {
-    this.changeValue({
-      oldValue: this.name,
-      newValue
-    });
-  };
 
   protected cloneWithMap(map: (node: this) => void): this {
     const insides = Object.getOwnPropertyDescriptors(this);
@@ -27,17 +14,29 @@ export class Cloneable extends InnerNode {
         if (prop == '__target__') {
           return target;
         }
-        const value = target[prop as string].value;
-        if (typeof value === 'function') {
-          return value.bind(proxy);
+        if (target.hasOwnProperty(prop)) {
+          const value = target[prop as string].value;
+          if (typeof value === 'function') {
+            return value.bind(proxy);
+          }
+          return value;
+        } else if (this.hasOwnProperty(prop)) {
+          const value = this[prop];
+          if (typeof value === 'function') {
+            return value.bind(proxy);
+          }
+          return value;
         }
-        return value;
       },
       set: (target, prop, value) => {
         return (target[prop as string].value = value);
       }
     });
     map(<any>insidesProxy);
+
+    (<any>insidesProxy.__target__).id.value = Node.id++;
+    (<any>insidesProxy.__target__).copyCount.value++;
+    Node.sumCopyCount++;
 
     return Object.create(Object.getPrototypeOf(this), <any>insidesProxy.__target__);
   }
@@ -46,6 +45,8 @@ export class Cloneable extends InnerNode {
     const insides = Object.getOwnPropertyDescriptors(this);
     insides[propertyName].value = value;
     insides.id.value = Node.id++;
+    insides.copyCount.value++;
+    Node.sumCopyCount++;
 
     return Object.create(Object.getPrototypeOf(this), insides);
   }
@@ -53,6 +54,8 @@ export class Cloneable extends InnerNode {
   protected cloneWithModify({ oldValue, newValue }: { oldValue: any; newValue: any }): this {
     const insides = Object.getOwnPropertyDescriptors(this);
     insides.id.value = Node.id++;
+    insides.copyCount.value++;
+    Node.sumCopyCount++;
 
     let wasMatch = false;
     for (let name in insides) {

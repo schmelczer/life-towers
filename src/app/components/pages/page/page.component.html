@@ -1,7 +1,4 @@
-<button
-  *ngIf="page && page.towers.length < 5 && !dataService.active?.userData?.hideCreateTowerButton"
-  (click)="createTower()"
->
+<button *ngIf="page && page.towers.length < 5 && !page.userData?.hideCreateTowerButton" (click)="page.addTower()">
   Create tower
 </button>
 

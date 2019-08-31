@@ -1,26 +1,18 @@
-import { Base } from './base';
+import { Serializable } from './serializable';
 import { IBlock } from '../interfaces/persistance/block';
-import { Color } from './color';
+import { Node } from '../storage/node';
 
-export class Block extends Base implements IBlock {
-  constructor(props: IBlock) {
-    // TODO: remove
-    if (props.isDone === undefined) {
-      props.isDone = true;
-    }
-
-    super(props);
+export class Block extends Serializable implements IBlock {
+  constructor(parent: Node, props: IBlock) {
+    super(parent, props);
 
     if (this.created.constructor.name !== 'Date') {
-      // Prevent update message
-      // @ts-ignore
-      this.__created = new Date(this.created);
+      this.created = new Date(this.created);
     }
   }
 
-  color: Color;
-
   // Only here to prevent ts warnings.
+  type: 'Block';
   created: Date;
   isDone: boolean;
   description: string;

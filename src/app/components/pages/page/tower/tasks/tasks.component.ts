@@ -3,6 +3,8 @@ import { Block } from '../../../../../model/block';
 import { Tower } from '../../../../../model/tower';
 import { ModalService } from '../../../../../services/modal.service';
 import { CancelService } from '../../../../../services/cancel.service';
+import { toHslString } from '../../../../../utils/color';
+import { IColor } from '../../../../../interfaces/persistance/color';
 
 @Component({
   selector: 'app-tasks',
@@ -10,7 +12,9 @@ import { CancelService } from '../../../../../services/cancel.service';
   styleUrls: ['./tasks.component.scss']
 })
 export class TasksComponent implements OnInit {
-  @Input() tasks: Block[];
+  readonly toHslString = toHslString;
+
+  @Input() tasks: Array<Block & { color: IColor }>;
   @Input() tower: Tower;
 
   private _isOpen = false;

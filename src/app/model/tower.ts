@@ -1,54 +1,51 @@
 import { ITower } from '../interfaces/persistance/tower';
-import { Color } from './color';
+import { lighten } from '../utils/color';
 import { Block } from './block';
-import { Base } from './base';
-import { IBlock } from '../interfaces/persistance/block';
+import { Serializable } from './serializable';
 import { hash } from '../utils/hash';
+import { Node } from '../storage/node';
+import { IColor } from '../interfaces/persistance/color';
 
-export class Tower extends Base implements ITower {
-  constructor(props: ITower) {
-    super(props);
+export class Tower extends Serializable implements ITower {
+  constructor(parent: Node, props: ITower) {
+    super(parent, props);
 
-    // @ts-ignore to prevent update message
-    this.__baseColor = new Color(this.baseColor);
-
-    this.blocks = this.blocks.map(b => this.createBlock(b));
     this.blocks.sort((a, b) => a.created.getTime() - b.created.getTime());
+    this.calculateTagList();
   }
 
   tags: string[];
 
   // Only here to prevent ts warnings.
   name: string;
-  blocks: Block[];
-  baseColor: Color;
+  type: 'Tower';
+  get blocks(): Array<Block> {
+    return this.children as Array<Block>;
+  }
+  baseColor: IColor;
+
+  get coloredBlocks(): Array<Block & { color: IColor }> {
+    return this.children.map(b => {
+      const coloredBlock = b as Block & { color: IColor };
+      coloredBlock.color = lighten((hash(coloredBlock.tag) - 0.5) * 50, this.baseColor);
+      return coloredBlock;
+    });
+  }
 
   addBlock(props: { tag: string; description: string; isDone: boolean }) {
-    this.blocks.push(
-      this.createBlock({
-        created: new Date(),
-        ...props
-      })
-    );
-
-    this.update();
+    new Block(this, {
+      created: new Date(),
+      ...props,
+      type: 'Block'
+    });
   }
 
-  private createBlock(props: IBlock): Block {
-    const block = new Block(props);
-    block.subscribe(() => this.update());
-    return block;
-  }
-
-  protected update() {
+  private calculateTagList() {
     this.tags = [];
     for (const block of this.blocks) {
       if (!this.tags.includes(block.tag)) {
         this.tags.push(block.tag);
       }
-      block.color = this.baseColor.lighten(hash(block.tag) * 50);
     }
-
-    super.update();
   }
 }
