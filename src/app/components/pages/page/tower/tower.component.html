@@ -18,7 +18,7 @@
     id="tower-name"
     type="text"
     placeholder="name…"
-    [(ngModel)]="tower.name"
-    [ngStyle]="{ color: toHslString(tower?.baseColor) }"
+    [(ngModel)]="towerName"
+    [ngStyle]="{ color: tower?.baseColor | color }"
   />
 </div>

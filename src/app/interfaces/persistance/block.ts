@@ -1,7 +1,4 @@
-import { Typed } from './typed';
-
-export interface IBlock extends Typed {
-  type: 'Block';
+export interface IBlock {
   created: Date;
   tag: string;
   isDone: boolean;

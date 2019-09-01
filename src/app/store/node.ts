@@ -14,6 +14,8 @@ export abstract class Node {
     Node.sumCopyCount++;
   }
 
+  abstract mutatedUpdate(): void;
+
   addChild(update: { value: InnerNode }) {
     this.changeValue({
       oldValue: this.children,
@@ -22,6 +24,10 @@ export abstract class Node {
   }
 
   changeChild({ oldValue, newValue }: { oldValue: InnerNode; newValue: InnerNode }) {
+    if (oldValue === newValue) {
+      return;
+    }
+
     this.changeValue({
       oldValue: this.children,
       newValue: this.children.map(c => (c === oldValue ? newValue : c))

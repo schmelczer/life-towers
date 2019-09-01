@@ -1,9 +1,7 @@
 import { IBlock } from './block';
-import { IColor } from './color';
-import { Typed } from './typed';
+import { IColor } from '../color';
 
-export interface ITower extends Typed {
-  type: 'Tower';
+export interface ITower {
   name: string;
   blocks: IBlock[];
   baseColor: IColor;

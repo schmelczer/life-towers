@@ -15,6 +15,10 @@ export class Root<T extends InnerNode> extends Node {
     this._children.next(value);
   }
 
+  mutatedUpdate() {
+    // pass
+  }
+
   changeValue({ oldValue, newValue }: { oldValue: any; newValue: any }) {
     if (this.children !== oldValue) {
       throw new TypeError('Only children can be changed.');

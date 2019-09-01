@@ -1,8 +1,7 @@
-import { Cloneable } from '../storage/cloneable';
-import { Node } from '../storage/node';
+import { Cloneable } from '../store/cloneable';
+import { Node } from '../store/node';
 
 export class Serializable extends Cloneable {
-  type: string;
   private static propertyList: any = {};
   static childrenMap: {
     [type: string]: {
@@ -11,7 +10,11 @@ export class Serializable extends Cloneable {
     };
   };
 
-  constructor(parent: Node, properties: any) {
+  protected onAfterClone(): void {
+    // pass
+  }
+
+  protected constructor(parent: Node, properties: any) {
     super(parent);
 
     const type = this.constructor.name;

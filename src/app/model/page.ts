@@ -1,21 +1,19 @@
 import { Serializable } from './serializable';
 import { IPage } from '../interfaces/persistance/page';
 import { Tower } from './tower';
-import { Node } from '../storage/node';
+import { Node } from '../store/node';
 
 export class Page extends Serializable implements IPage {
   constructor(parent: Node, props: IPage) {
     super(parent, props);
   }
 
-  // Only here to prevent ts warnings.
-  name: string;
+  readonly name: string;
   get towers(): Array<Tower> {
     return this.children as Array<Tower>;
   }
-  type: 'Page';
 
-  userData: {
+  readonly userData: {
     hideCreateTowerButton: boolean;
     defaultDateRange: {
       from: Date;
@@ -38,10 +36,14 @@ export class Page extends Serializable implements IPage {
       return;
     }
 
-    this.map(page => {
-      const tower = page.towers[previousIndex];
-      page.towers.splice(previousIndex, 1);
-      page.towers.splice(currentIndex, 0, tower);
+    const towers = [...this.towers];
+    const tower = towers[previousIndex];
+    towers.splice(previousIndex, 1);
+    towers.splice(currentIndex, 0, tower);
+
+    this.changeValue({
+      oldValue: this.towers,
+      newValue: towers
     });
   }
 
@@ -52,10 +54,9 @@ export class Page extends Serializable implements IPage {
     } while (30 <= hue && hue <= 200);
 
     new Tower(this, {
-      type: 'Tower',
       name,
       blocks: [],
-      baseColor: { h: hue, s: 100, l: 50, type: 'Color' }
+      baseColor: { h: hue, s: 100, l: 50 }
     });
   }
 

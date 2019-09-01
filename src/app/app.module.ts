@@ -22,6 +22,7 @@ import { CreateBlockComponent } from './components/modal/modals/create-block/cre
 import { RemoveBlockComponent } from './components/modal/modals/remove-block/remove-block.component';
 import { ToggleComponent } from './components/shared/toggle/toggle.component';
 import { TasksComponent } from './components/pages/page/tower/tasks/tasks.component';
+import { ColorPipe } from './pipes/color.pipe';
 
 @NgModule({
   declarations: [
@@ -41,7 +42,8 @@ import { TasksComponent } from './components/pages/page/tower/tasks/tasks.compon
     CreateBlockComponent,
     RemoveBlockComponent,
     ToggleComponent,
-    TasksComponent
+    TasksComponent,
+    ColorPipe
   ],
   imports: [BrowserModule, AppRoutingModule, FormsModule, BrowserAnimationsModule, DragDropModule],
   providers: [],

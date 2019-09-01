@@ -24,7 +24,7 @@
   <app-toggle
     [beforeText]="'This task hasn\'t been finished yet'"
     [afterText]="'Goal already accomplished'"
-    [default]="!modalService.active.input.isTask"
+    [default]="isDone"
     (value)="isDone = $event"
   ></app-toggle>
 </div>

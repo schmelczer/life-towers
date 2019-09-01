@@ -1,10 +1,12 @@
 import { InnerNode } from './inner-node';
 import { Node } from './node';
 
-export class Cloneable extends InnerNode {
-  constructor(parent: Node) {
+export abstract class Cloneable extends InnerNode {
+  protected constructor(parent: Node) {
     super(parent);
   }
+
+  protected abstract onAfterClone(): void;
 
   protected cloneWithMap(map: (node: this) => void): this {
     const insides = Object.getOwnPropertyDescriptors(this);
@@ -20,8 +22,8 @@ export class Cloneable extends InnerNode {
             return value.bind(proxy);
           }
           return value;
-        } else if (this.hasOwnProperty(prop)) {
-          const value = this[prop];
+        } else if (target.prototype.hasOwnProperty(prop)) {
+          const value = target.prototype[prop];
           if (typeof value === 'function') {
             return value.bind(proxy);
           }
@@ -34,28 +36,44 @@ export class Cloneable extends InnerNode {
     });
     map(<any>insidesProxy);
 
-    (<any>insidesProxy.__target__).id.value = Node.id++;
-    (<any>insidesProxy.__target__).copyCount.value++;
-    Node.sumCopyCount++;
-
-    return Object.create(Object.getPrototypeOf(this), <any>insidesProxy.__target__);
+    return this.cloneFromInsides(<any>insidesProxy.__target__);
   }
 
-  protected cloneWithAdd({ value, propertyName }: { value: any; propertyName: string }): this {
+  protected cloneWithAdd({ propertyName, value }: { value: any; propertyName: string }): this {
+    if (this[propertyName] === value) {
+      return this;
+    }
+
     const insides = Object.getOwnPropertyDescriptors(this);
     insides[propertyName].value = value;
-    insides.id.value = Node.id++;
-    insides.copyCount.value++;
-    Node.sumCopyCount++;
+    return this.cloneFromInsides(insides);
+  }
 
-    return Object.create(Object.getPrototypeOf(this), insides);
+  protected cloneWithChangedKeys(props: { [propertyName: string]: any }): this {
+    const insides = Object.getOwnPropertyDescriptors(this);
+
+    for (let key in props) {
+      if (props.hasOwnProperty(key)) {
+        if (insides.hasOwnProperty(key)) {
+          insides[key].value = props[key];
+        } else {
+          // @ts-ignore
+          insides[key] = {
+            value: props[key]
+          };
+        }
+      }
+    }
+
+    return this.cloneFromInsides(insides);
   }
 
   protected cloneWithModify({ oldValue, newValue }: { oldValue: any; newValue: any }): this {
+    if (oldValue === newValue) {
+      return this;
+    }
+
     const insides = Object.getOwnPropertyDescriptors(this);
-    insides.id.value = Node.id++;
-    insides.copyCount.value++;
-    Node.sumCopyCount++;
 
     let wasMatch = false;
     for (let name in insides) {
@@ -69,6 +87,16 @@ export class Cloneable extends InnerNode {
       throw new TypeError(`Object has no property with value: ${oldValue.toString()}`);
     }
 
-    return Object.create(Object.getPrototypeOf(this), insides);
+    return this.cloneFromInsides(insides);
+  }
+
+  private cloneFromInsides(insides): this {
+    insides.id.value = Node.id++;
+    insides.copyCount.value++;
+    Node.sumCopyCount++;
+
+    const clone = Object.create(Object.getPrototypeOf(this), insides);
+    clone.onAfterClone();
+    return clone;
   }
 }

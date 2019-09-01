@@ -6,7 +6,7 @@
 
   <p>
     You are trying to remove
-    <span [ngStyle]="{ color: modalService.active.input.baseColor.toString() }">{{
+    <span [ngStyle]="{ color: modalService.active.input.baseColor | color }">{{
       modalService.active.input.name ? modalService.active.input.name : 'an unnamed tower'
     }}</span
     >.

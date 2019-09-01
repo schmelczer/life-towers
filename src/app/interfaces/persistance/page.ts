@@ -1,8 +1,6 @@
 import { ITower } from './tower';
-import { Typed } from './typed';
 
-export interface IPage extends Typed {
-  type: 'Page';
+export interface IPage {
   name: string;
   towers: ITower[];
 

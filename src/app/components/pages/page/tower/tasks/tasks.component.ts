@@ -3,8 +3,8 @@ import { Block } from '../../../../../model/block';
 import { Tower } from '../../../../../model/tower';
 import { ModalService } from '../../../../../services/modal.service';
 import { CancelService } from '../../../../../services/cancel.service';
-import { toHslString } from '../../../../../utils/color';
-import { IColor } from '../../../../../interfaces/persistance/color';
+import { IColor } from '../../../../../interfaces/color';
+import { IBlock } from '../../../../../interfaces/persistance/block';
 
 @Component({
   selector: 'app-tasks',
@@ -12,8 +12,6 @@ import { IColor } from '../../../../../interfaces/persistance/color';
   styleUrls: ['./tasks.component.scss']
 })
 export class TasksComponent implements OnInit {
-  readonly toHslString = toHslString;
-
   @Input() tasks: Array<Block & { color: IColor }>;
   @Input() tower: Tower;
 
@@ -48,12 +46,16 @@ export class TasksComponent implements OnInit {
         isDone: block.isDone
       });
 
-      block.tag = selected;
-      block.description = description;
+      const change: Partial<IBlock> = {
+        tag: selected,
+        description,
+        isDone
+      };
       if (!block.isDone && isDone) {
-        block.created = new Date();
+        change.created = new Date();
       }
-      block.isDone = isDone;
+
+      block.changeProperties(change);
     } catch {
       // pass
     }

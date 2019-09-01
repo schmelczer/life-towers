@@ -9,7 +9,7 @@ import { ModalService } from '../../../../services/modal.service';
 export class CreateBlockComponent {
   selected: string;
   description: string = null;
-  isDone: boolean;
+  isDone: boolean = !this.modalService.active.input.isTask;
 
   constructor(public modalService: ModalService) {}
 

@@ -1,4 +1,4 @@
-import { IColor } from '../interfaces/persistance/color';
+import { IColor } from '../interfaces/color';
 
 export const lighten = (by: number, { h, s, l }: IColor): IColor => {
   let newL = l + by;
@@ -8,7 +8,7 @@ export const lighten = (by: number, { h, s, l }: IColor): IColor => {
     newL = 0;
   }
 
-  return { h, s, l: newL, type: 'Color' };
+  return { h, s, l: newL };
 };
 
 export const toHslString = ({ h, s, l }: IColor): string => {

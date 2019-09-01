@@ -1,4 +1,5 @@
 import { Node } from './node';
+import { observableToBeFn } from 'rxjs/internal/testing/TestScheduler';
 
 export abstract class InnerNode extends Node {
   parent: Node;
@@ -17,21 +18,31 @@ export abstract class InnerNode extends Node {
   protected constructor(parent: Node) {
     super();
 
-    parent.addChild({
-      value: this
-    });
+    new Promise(r => r()).then(() =>
+      parent.addChild({
+        value: this
+      })
+    );
+  }
+
+  mutatedUpdate() {
+    this.parent.mutatedUpdate();
   }
 
   map(map: (a: this) => void) {
     return this.update((self: this) => this.cloneWithMap.call(self, map));
   }
 
-  changeKey(update: { propertyName: string; value: any }): this {
-    return this.update((self: this) => this.cloneWithAdd.call(self, update));
+  changeKey({ propertyName, value }: { propertyName: string; value: any }): this {
+    return this.update((self: this) => this.cloneWithAdd.call(self, { propertyName, value }));
   }
 
-  changeValue(update: { oldValue: any; newValue: any }): this {
-    return this.update((self: this) => this.cloneWithModify.call(self, update));
+  changeKeys(props: { [propertyName: string]: any }): this {
+    return this.update((self: this) => this.cloneWithChangedKeys.call(self, props));
+  }
+
+  changeValue({ oldValue, newValue }: { oldValue: any; newValue: any }): this {
+    return this.update((self: this) => this.cloneWithModify.call(self, { oldValue, newValue }));
   }
 
   addChild(update: { value: InnerNode }) {
@@ -44,6 +55,7 @@ export abstract class InnerNode extends Node {
 
   protected abstract cloneWithMap(map: (a: this) => void): this;
   protected abstract cloneWithAdd(update: { value: any; propertyName: string }): this;
+  protected abstract cloneWithChangedKeys(props: { [propertyName: string]: any }): this;
   protected abstract cloneWithModify(update: { oldValue: any; newValue: any }): this;
 
   private update(cloneMethod: (self: this) => this): this {
@@ -52,6 +64,10 @@ export abstract class InnerNode extends Node {
     }
 
     const clone = cloneMethod(this);
+    if (clone === this) {
+      return this;
+    }
+
     for (let child of clone.children) {
       child.parent = clone;
     }

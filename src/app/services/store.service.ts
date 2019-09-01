@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Page } from '../model/page';
 import { IPage } from '../interfaces/persistance/page';
 
-const LOCAL_STORAGE_KEY = 'life-towers.data.v.3';
+const LOCAL_STORAGE_KEY = 'life-towers.data.v.2';
 
 @Injectable({
   providedIn: 'root'
@@ -15,84 +15,77 @@ export class StoreService<T> {
     {
       name: 'Work & life',
       userData: {},
-      type: 'Page',
       towers: [
         {
           name: 'work',
-          baseColor: { h: 0, s: 100, l: 50, type: 'Color' },
-          type: 'Tower',
+          baseColor: { h: 0, s: 100, l: 50 },
           blocks: [
             {
               created: new Date(2015, 2, 13),
               tag: 'a',
               description: 'done it',
-              isDone: true,
-              type: 'Block'
+              isDone: true
             },
             {
               created: new Date(2016, 2, 15),
               tag: 'go to school',
               description: 'done it',
-              type: 'Block'
+              isDone: false
             },
             {
               created: new Date(2017, 2, 15),
               tag: 'go to work',
-              isDone: true,
-              type: 'Block'
+              isDone: true
             },
             {
               created: new Date(2018, 2, 13),
               tag: 'go to work',
               description: 'done it',
-              isDone: true,
-              type: 'Block'
+              isDone: true
             },
             {
               created: new Date(2019, 3, 13),
               tag: 'go to work',
-              type: 'Block'
+              isDone: false
             },
             {
               created: new Date(2020, 2, 15),
               tag: 'go to school',
               description: 'done it',
-              isDone: true,
-              type: 'Block'
+              isDone: true
             },
             {
               created: new Date(2021, 2, 15),
               tag: 'go to school',
-              type: 'Block'
+              isDone: false
             }
           ]
         },
         {
-          baseColor: { h: 180, s: 100, l: 50, type: 'Color' },
+          baseColor: { h: 180, s: 100, l: 50 },
           name: 'life',
-          type: 'Tower',
           blocks: [
             {
               created: new Date(2019, 3, 13),
               tag: 'go home',
               description: 'done it',
-              type: 'Block'
+              isDone: false
             },
             {
               created: new Date(2019, 4, 13),
               tag: 'go home',
-              type: 'Block'
+              isDone: false
             },
             {
               created: new Date(2019, 4, 15),
               tag: 'go to work',
               description: 'done it',
-              type: 'Block'
+              isDone: false
             },
             {
               created: new Date(2019, 4, 15, 14),
               tag: 'go to work',
-              type: 'Block'
+              isDone: false
             }
           ]
         }
@@ -105,14 +98,14 @@ export class StoreService<T> {
     this.storedData = JSON.parse(localStorageData ? localStorageData : this.mockData) as T;
   }
 
-  scheduleSave(data: T) {
+  scheduleSave(data: T, timeout: number) {
     this.dataToSave = data;
     if (!this.saveScheduled) {
       this.saveScheduled = true;
       setTimeout(() => {
         this.saveScheduled = false;
         this.save(this.dataToSave).catch();
-      }, 0);
+      }, timeout);
     }
   }
 

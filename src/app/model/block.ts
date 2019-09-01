@@ -1,20 +1,30 @@
 import { Serializable } from './serializable';
 import { IBlock } from '../interfaces/persistance/block';
-import { Node } from '../storage/node';
+import { Node } from '../store/node';
 
 export class Block extends Serializable implements IBlock {
   constructor(parent: Node, props: IBlock) {
     super(parent, props);
+    this.onAfterClone();
+  }
 
+  protected onAfterClone(): void {
     if (this.created.constructor.name !== 'Date') {
       this.created = new Date(this.created);
     }
+
+    // TODO: remove.
+    if (this.isDone === null || this.isDone === undefined) {
+      this.isDone = false;
+    }
   }
 
-  // Only here to prevent ts warnings.
-  type: 'Block';
+  changeProperties(values: Partial<IBlock>) {
+    this.changeKeys(values);
+  }
+
   created: Date;
   isDone: boolean;
-  description: string;
-  tag: string;
+  readonly description: string;
+  readonly tag: string;
 }

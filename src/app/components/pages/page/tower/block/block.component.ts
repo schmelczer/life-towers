@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { Block } from '../../../../../model/block';
 import { ModalService } from '../../../../../services/modal.service';
-import { Tower } from '../../../../../model/tower';
+import { ColoredBlock, Tower } from '../../../../../model/tower';
 
 @Component({
   selector: 'app-block',
@@ -9,7 +9,7 @@ import { Tower } from '../../../../../model/tower';
   styleUrls: ['./block.component.scss']
 })
 export class BlockComponent {
-  @Input() block: Block;
+  @Input() block: ColoredBlock;
   @Input() tower: Tower;
 
   constructor(private modalService: ModalService) {}
@@ -22,9 +22,12 @@ export class BlockComponent {
         description: this.block.description,
         isDone: this.block.isDone
       });
-      this.block.tag = selected;
-      this.block.description = description;
-      this.block.isDone = isDone;
+      console.log(description);
+      this.block.changeProperties({
+        tag: selected,
+        description,
+        isDone
+      });
     } catch {
       // pass
     }

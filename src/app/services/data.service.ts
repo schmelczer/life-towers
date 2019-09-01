@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { StoreService } from './store.service';
 import { Page } from '../model/page';
-import { Root } from '../storage/root';
+import { Root } from '../store/root';
 import { Serializable } from '../model/serializable';
 import { Tower } from '../model/tower';
 import { Block } from '../model/block';
@@ -47,15 +47,22 @@ export class DataService extends Root<Page> {
     this.children$.subscribe(value => {
       this.log();
       this._safeChildren.next(value);
-      this.storeService.scheduleSave(this.pages);
+      this.save(0);
     });
+  }
+
+  mutatedUpdate() {
+    this.save(2500);
+  }
+
+  save(timeout: number) {
+    this.storeService.scheduleSave(this.pages, timeout);
   }
 
   addPage(name: string) {
     new Page(this, {
       name,
       userData: {},
-      type: 'Page',
       towers: []
     });
   }
