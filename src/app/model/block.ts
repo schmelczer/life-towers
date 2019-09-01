@@ -4,7 +4,7 @@ import { Node } from '../store/node';
 
 export class Block extends Serializable implements IBlock {
   constructor(parent: Node, props: IBlock) {
-    super(parent, props);
+    super(parent, props, 'Block');
     this.onAfterClone();
   }
 

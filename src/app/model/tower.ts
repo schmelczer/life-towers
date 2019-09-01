@@ -9,6 +9,8 @@ import { IColor } from '../interfaces/color';
 export type ColoredBlock = Block & { color: IColor };
 
 export class Tower extends Serializable implements ITower {
+  protected type = 'Tower';
+
   tags: string[];
   name: string;
 
@@ -21,7 +23,7 @@ export class Tower extends Serializable implements ITower {
   readonly baseColor: IColor;
 
   constructor(parent: Node, props: ITower) {
-    super(parent, props);
+    super(parent, props, 'Tower');
     this.onAfterClone();
   }
 

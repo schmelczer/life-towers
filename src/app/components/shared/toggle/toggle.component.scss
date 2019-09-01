@@ -26,6 +26,7 @@
 
   input[type='checkbox'] {
     -webkit-appearance: none;
+    -moz-appearance: none;
 
     width: 2 * $size;
     height: $size;

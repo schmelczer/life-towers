@@ -5,7 +5,7 @@ import { Node } from '../store/node';
 
 export class Page extends Serializable implements IPage {
   constructor(parent: Node, props: IPage) {
-    super(parent, props);
+    super(parent, props, 'Page');
   }
 
   readonly name: string;

@@ -30,15 +30,18 @@ export class DataService extends Root<Page> {
     Serializable.childrenMap = {
       Page: {
         childrenListName: 'towers',
-        childrenConstructor: Tower
+        childrenConstructor: Tower,
+        childrenType: 'Tower'
       },
       Tower: {
         childrenListName: 'blocks',
-        childrenConstructor: Block
+        childrenConstructor: Block,
+        childrenType: 'Block'
       },
       Block: {
         childrenListName: null,
-        childrenConstructor: null
+        childrenConstructor: null,
+        childrenType: null
       }
     };
 

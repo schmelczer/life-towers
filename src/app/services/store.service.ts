@@ -114,7 +114,7 @@ export class StoreService<T> {
     return this.storedData;
   }
 
-  async save(data: T) {
+  async save(data: T): Promise<void> {
     this.storedData = data;
     const stringified = JSON.stringify(this.storedData, null, 2);
     console.log('save');

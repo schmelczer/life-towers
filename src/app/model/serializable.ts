@@ -2,11 +2,14 @@ import { Cloneable } from '../store/cloneable';
 import { Node } from '../store/node';
 
 export class Serializable extends Cloneable {
+  protected type: string;
+
   private static propertyList: any = {};
   static childrenMap: {
     [type: string]: {
       childrenConstructor: typeof Serializable;
       childrenListName: string;
+      childrenType: string;
     };
   };
 
@@ -14,29 +17,34 @@ export class Serializable extends Cloneable {
     // pass
   }
 
-  protected constructor(parent: Node, properties: any) {
+  protected constructor(parent: Node, properties: any, type: string) {
     super(parent);
 
-    const type = this.constructor.name;
-    if (!Serializable.propertyList.hasOwnProperty(type)) {
-      Serializable.propertyList[type] = [];
+    const compiledType = this.constructor.name;
+    if (!Serializable.propertyList.hasOwnProperty(compiledType)) {
+      Serializable.propertyList[compiledType] = [];
     }
     for (const property in properties) {
       if (properties.hasOwnProperty(property)) {
         const propertyValue = properties[property];
+        // This should be ran after the original constructor has finished.
+        console.log(type);
         if (property === Serializable.childrenMap[type].childrenListName) {
-          // This should be ran after the original constructor has finished.
           new Promise(r => r()).then(() => {
             for (let child of propertyValue) {
-              new Serializable.childrenMap[type].childrenConstructor(this, child);
+              new Serializable.childrenMap[type].childrenConstructor(
+                this,
+                child,
+                Serializable.childrenMap[type].childrenType
+              );
             }
           });
         } else {
           this[property] = properties[property];
         }
 
-        if (!Serializable.propertyList[type].includes(property)) {
-          Serializable.propertyList[type].push(property);
+        if (!Serializable.propertyList[compiledType].includes(property)) {
+          Serializable.propertyList[compiledType].push(property);
         }
       }
     }
