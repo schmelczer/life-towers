@@ -1,4 +1,4 @@
-<div class="container {{ tasks.length > 0 ? 'show-hover' : '' }}">
+<div *ngIf="tasks" class="container {{ tasks.length > 0 ? 'show-hover' : '' }}">
   <p class="header" (click)="isOpen = !isOpen">
     <strong>
       {{ tasks.length == 0 ? '' : tasks.length }}

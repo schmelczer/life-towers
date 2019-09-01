@@ -27,19 +27,6 @@ export class PagesComponent {
     return [];
   }
 
-  get selectedPage(): Page {
-    try {
-      return this.pages[this.pageNames.indexOf(this.selectedPageName)];
-    } catch {
-      return null;
-    }
-  }
-
-  private _selectedPageName: string;
-  get selectedPageName(): string {
-    return this._selectedPageName;
-  }
-
   set selectedPageName(value: string) {
     window.localStorage.setItem(
       USER_DATA_KEY,
@@ -47,7 +34,8 @@ export class PagesComponent {
         selectedPage: value
       })
     );
-    this._selectedPageName = value;
+    const index = this.pageNames.indexOf(value);
+    this._selectedPage.next(index >= 0 ? this.pages[0] : null);
   }
 
   private readonly _selectedPage: BehaviorSubject<Page> = new BehaviorSubject(null);
@@ -56,26 +44,20 @@ export class PagesComponent {
   constructor(public dataService: DataService, private modalService: ModalService) {
     const userData = JSON.parse(window.localStorage.getItem(USER_DATA_KEY));
     if (userData !== null && userData.selectedPage !== undefined) {
-      this._selectedPageName = userData.selectedPage;
+      this.selectedPageName = userData.selectedPage;
     }
 
-    this.dataService.safeChildren$.subscribe(pages => {
+    this.dataService.children$.subscribe(pages => {
       if (pages) {
         this.pages = pages;
-        if (!this.selectedPage) {
-          this.selectedPageName = this.pages.length > 0 ? this.pages[0].name : null;
+        if (!this._selectedPage.getValue() && this.pages.length > 0) {
+          this.selectedPageName = this.pages[0].name;
+        } else if (this._selectedPage.getValue()) {
+          // To trigger update on new page.
+          this.selectedPageName = this._selectedPage.getValue().name;
         }
-        this._selectedPage.next(this.selectedPage);
       }
     });
-  }
-
-  async selectPage(selected: string) {
-    if (!this.pageNames.includes(selected)) {
-      this.dataService.addPage(selected);
-    }
-    this.selectedPageName = selected;
-    this._selectedPage.next(this.selectedPage);
   }
 
   async openSettings() {

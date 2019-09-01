@@ -1,21 +1,21 @@
-<button *ngIf="page && page.towers.length < 5 && !page.userData?.hideCreateTowerButton" (click)="page.addTower()">
-  Create tower
-</button>
-
 <section class="towers" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="dropDrag($event)">
   <app-tower
-    *ngFor="let tower of page?.towers"
-    [tower]="tower"
-    [dateRange]="dateRange"
+    *ngFor="let tower of towers"
+    [tower$]="tower.asObservable()"
+    [dateRange$]="dateRange"
     cdkDrag
-    (cdkDragStarted)="startDrag(page.towers.indexOf(tower))"
+    (cdkDragStarted)="startDrag(towers.indexOf(tower))"
   ></app-tower>
+  <div *ngIf="(page$ | async)?.towers.length < 5 && !(page$ | async)?.userData?.hideCreateTowerButton">
+    <img src="assets/plus-sign.svg" alt="add tower" class="add-tower" (click)="page.addTower()" />
+  </div>
 </section>
 
 <img
   [ngClass]="isDragging ? 'active' : ''"
   src="assets/trash.svg"
   alt="trashcan"
+  class="trash"
   (pointerenter)="trashEnter()"
   (pointerleave)="trashExit()"
   (pointerup)="removeTower()"
@@ -26,7 +26,6 @@
     *ngIf="dates.length >= MIN_BLOCK_COUNT_BEFORE_SHOWING_SLIDER"
     [values]="dates"
     [labels]="dateLabels"
-    (lowerBound)="startDate = $event"
-    (upperBound)="endDate = $event"
+    (range)="dateRange.next($event)"
   ></app-double-slider>
 </div>

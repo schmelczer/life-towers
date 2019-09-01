@@ -1,51 +1,97 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { ColoredBlock, Tower } from '../../../../model/tower';
 import { ModalService } from '../../../../services/modal.service';
+import { Observable } from 'rxjs/internal/Observable';
+import { Range } from '../../../../interfaces/range';
+import { top } from '../../../../utils/top';
+
+type StyledBlock = ColoredBlock & { style: { [p: string]: string }; shouldDraw: boolean; cssClass: string };
 
 @Component({
   selector: 'app-tower',
   templateUrl: './tower.component.html',
   styleUrls: ['./tower.component.scss']
 })
-export class TowerComponent {
+export class TowerComponent implements OnInit {
+  @Input() dateRange$: Observable<Range<Date>>;
+  private dateRange: Range<Date>;
+
+  @Input() tower$: Observable<Tower>;
+  private tower: Tower;
+
   get towerName(): string {
-    return this.tower.name;
+    return this.tower ? this.tower.name : 'Loading…';
   }
 
   set towerName(value: string) {
     this.tower.changeName(value);
   }
 
-  @Input() set dateRange(value: { from: Date; to: Date }) {
-    if (this.dateRange !== undefined && this.dateRange.from === value.from && this.dateRange.to === value.to) {
-      return;
-    }
-    this._dateRange = value;
-  }
-
-  get dateRange(): { from: Date; to: Date } {
-    return this._dateRange;
+  tasks: Array<ColoredBlock>;
+  blocks: Array<StyledBlock> = [];
+  get drawableBlocks(): Array<StyledBlock> {
+    return this.blocks.filter(b => b.shouldDraw);
   }
 
   public constructor(private modalService: ModalService) {}
 
-  get drawableBlocks(): Array<ColoredBlock> {
-    return this.tower.coloredBlocks.filter(
-      block => this.dateRange.from <= block.created && block.created <= this.dateRange.to && block.isDone
-    );
+  ngOnInit() {
+    this.tower$.subscribe(value => {
+      if (value) {
+        this.blocks = value.coloredBlocks
+          .filter(b => b.isDone)
+          .map(b => {
+            let classedBlock = b as StyledBlock;
+            classedBlock.shouldDraw = true;
+            classedBlock.style = { transform: 'translateY(0)', opacity: '1' };
+            classedBlock.cssClass = '';
+            return classedBlock;
+          });
+
+        if (this.tower) {
+          let difference = this.tower.blocks.map((b, index) => {
+            return b === value.blocks[index];
+          });
+
+          if (
+            (difference.every(i => i) && this.tower.blocks.length < value.blocks.length) ||
+            this.tower.blocks.filter(b => b.isDone).length + 1 === value.blocks.filter(b => b.isDone).length
+          ) {
+            const lastBlock = top(this.blocks);
+            if (lastBlock) {
+              lastBlock.style = { opacity: '0' };
+              lastBlock.cssClass = 'descend';
+              setTimeout(() => (lastBlock.style = { transform: 'translateY(0)', opacity: '1' }), 0);
+            }
+          }
+        }
+
+        this.tasks = value.coloredBlocks.filter(block => !block.isDone);
+
+        this.tower = value;
+      }
+    });
+
+    this.dateRange$.subscribe(dateRange => {
+      this.initData(dateRange);
+      this.dateRange = dateRange;
+    });
   }
 
-  get tasks(): Array<ColoredBlock> {
-    return this.tower.coloredBlocks.filter(
-      block => this.dateRange.from <= block.created && block.created <= this.dateRange.to && !block.isDone
-    );
+  initData(newDateRange: Range<Date>) {
+    for (const block of this.blocks) {
+      block.shouldDraw = newDateRange.from <= block.created;
+
+      if ((block.cssClass === '' || block.cssClass === 'descend') && newDateRange.to < block.created) {
+        block.cssClass = 'ascend';
+        block.style = { transform: 'translateY(500%)', opacity: '0' };
+      }
+      if (block.shouldDraw && block.cssClass === 'ascend' && block.created < newDateRange.to) {
+        block.cssClass = 'descend';
+        block.style = { transform: 'translateY(0)', opacity: '1' };
+      }
+    }
   }
-
-  @Input() tower: Tower;
-
-  _dateRange: { from: Date; to: Date };
-
-  isFalling = true;
 
   public async addBlock() {
     try {

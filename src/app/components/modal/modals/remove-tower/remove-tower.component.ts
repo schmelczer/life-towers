@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { ModalService } from '../../../../services/modal.service';
+import { Tower } from '../../../../model/tower';
 
 @Component({
   selector: 'app-remove-tower',
@@ -8,4 +9,6 @@ import { ModalService } from '../../../../services/modal.service';
 })
 export class RemoveTowerComponent {
   constructor(public modalService: ModalService) {}
+
+  tower: Tower = this.modalService.active.input;
 }

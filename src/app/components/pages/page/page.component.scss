@@ -24,13 +24,31 @@
 
     transition: box-shadow $short-animation-time;
 
+    max-width: 800px;
+
     &.cdk-drop-list-dragging {
       *:not(.cdk-drag-placeholder) {
         transition: transform $long-animation-time cubic-bezier(0, 0, 0.2, 1);
       }
     }
 
-    max-width: 800px;
+    div {
+      @include center-child();
+      img.add-tower {
+        height: 48px;
+        @media (max-width: $mobile-width) {
+          height: 32px;
+        }
+
+        opacity: 0.33;
+        transition: opacity $long-animation-time;
+        cursor: pointer;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
 
     & > * {
       max-width: 200px;
@@ -65,7 +83,7 @@
     }
   }
 
-  img {
+  img.trash {
     @include square(48px);
     padding: 16px;
 

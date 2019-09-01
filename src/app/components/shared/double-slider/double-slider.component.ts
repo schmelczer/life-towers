@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { range } from '../../../utils/range';
+import { Range } from '../../../interfaces/range';
 
 @Component({
   selector: 'app-double-slider',
@@ -49,8 +50,7 @@ export class DoubleSliderComponent {
 
   private _values: any[];
 
-  @Output() lowerBound: EventEmitter<any> = new EventEmitter();
-  @Output() upperBound: EventEmitter<any> = new EventEmitter();
+  @Output() range: EventEmitter<Range<any>> = new EventEmitter();
 
   drawnLabels: string[];
 
@@ -93,12 +93,16 @@ export class DoubleSliderComponent {
   }
 
   private emitValue() {
-    if (this.oneValue < this.otherValue) {
-      this.lowerBound.emit(this.values[this.indexFromValue(this.oneValue)]);
-      this.upperBound.emit(this.values[this.indexFromValue(this.otherValue)]);
-    } else {
-      this.lowerBound.emit(this.values[this.indexFromValue(this.otherValue)]);
-      this.upperBound.emit(this.values[this.indexFromValue(this.oneValue)]);
-    }
+    const range = {
+      from:
+        this.oneValue < this.otherValue
+          ? this.values[this.indexFromValue(this.oneValue)]
+          : this.values[this.indexFromValue(this.otherValue)],
+      to:
+        this.oneValue < this.otherValue
+          ? this.values[this.indexFromValue(this.otherValue)]
+          : this.values[this.indexFromValue(this.oneValue)]
+    };
+    this.range.emit(range);
   }
 }

@@ -41,11 +41,17 @@ export class DataService extends Root<Page> {
         childrenConstructor: null
       }
     };
+
     for (let page of pages) {
       new Page(this, page);
     }
+    setTimeout(() => {
+      this.children$.subscribe(value => {
+        this.log();
+      });
+    }, 0);
+
     this.children$.subscribe(value => {
-      this.log();
       this._safeChildren.next(value);
       this.save(0);
     });
@@ -60,11 +66,12 @@ export class DataService extends Root<Page> {
   }
 
   addPage(name: string) {
-    new Page(this, {
+    const page = new Page(this, {
       name,
       userData: {},
       towers: []
     });
+    page.addTower();
   }
 
   removePage(page: Page) {

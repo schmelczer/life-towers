@@ -1,14 +1,20 @@
-<div class="tower">
+<div class="tower" *ngIf="tower$ | async">
   <div class="container">
     <div class="tasks-container">
-      <app-tasks [tasks]="tasks" [tower]="tower"></app-tasks>
+      <app-tasks [tasks]="tasks" [tower]="tower$ | async"></app-tasks>
     </div>
 
     <img src="assets/plus-sign.svg" alt="add item" (click)="addBlock()" />
 
     <div class="block-container-container">
-      <div class="block-container falling">
-        <app-block *ngFor="let block of drawableBlocks" [block]="block" [tower]="tower"></app-block>
+      <div class="block-container" *ngIf="blocks.length > 0">
+        <app-block
+          [ngClass]="block.cssClass"
+          [ngStyle]="block.style"
+          *ngFor="let block of drawableBlocks"
+          [block]="block"
+          [tower]="tower$ | async"
+        ></app-block>
       </div>
     </div>
   </div>
@@ -19,6 +25,6 @@
     type="text"
     placeholder="name…"
     [(ngModel)]="towerName"
-    [ngStyle]="{ color: tower?.baseColor | color }"
+    [ngStyle]="{ color: (tower$ | async)?.baseColor | color }"
   />
 </div>

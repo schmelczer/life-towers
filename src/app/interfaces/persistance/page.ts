@@ -1,4 +1,5 @@
 import { ITower } from './tower';
+import { Range } from '../range';
 
 export interface IPage {
   name: string;
@@ -6,9 +7,6 @@ export interface IPage {
 
   userData: {
     hideCreateTowerButton?: boolean;
-    defaultDateRange?: {
-      from: Date;
-      to: Date;
-    };
+    defaultDateRange?: Range<Date>;
   };
 }

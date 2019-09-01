@@ -59,12 +59,12 @@ export class SelectAddComponent {
       this.select(this.newOption);
       this.newOption = '';
     }
+    this.toggle();
   }
 
   select(option: string) {
     this.selected = option;
     this.value.emit(this.selected);
-    this.toggle();
   }
 
   toggle() {

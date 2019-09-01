@@ -1,57 +1,61 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { Page } from '../../../model/page';
 import { ModalService } from '../../../services/modal.service';
 import { DataService } from '../../../services/data.service';
+import { Observable } from 'rxjs/internal/Observable';
+import { Range } from '../../../interfaces/range';
+import { Subject } from 'rxjs/internal/Subject';
+import { Tower } from '../../../model/tower';
+import { BehaviorSubject } from 'rxjs/internal/BehaviorSubject';
 
 @Component({
   selector: 'app-page',
   templateUrl: './page.component.html',
   styleUrls: ['./page.component.scss']
 })
-export class PageComponent {
-  private _page: Page;
-  @Input() set page(value: Page) {
-    if (!value) {
-      return;
-    }
+export class PageComponent implements OnInit {
+  @Input() page$: Observable<Page>;
+  private page: Page;
 
-    this._page = value;
-    this.updateDates();
-  }
+  towers: Array<BehaviorSubject<Tower>> = [];
 
   @Output() isDragHappening: EventEmitter<boolean> = new EventEmitter();
 
-  get page(): Page {
-    return this._page;
-  }
-
-  readonly MIN_BLOCK_COUNT_BEFORE_SHOWING_SLIDER = 3;
+  readonly MIN_BLOCK_COUNT_BEFORE_SHOWING_SLIDER = 6;
 
   isDragging = false;
   draggedTowerIndex: number;
   nearTrashcan = false;
 
   dates: Date[] = [];
-  startDate: Date;
-  endDate: Date;
+  dateRange: Subject<Range<Date>> = new Subject<Range<Date>>();
 
   get dateLabels(): string[] {
     return this.dates.map(d => d.toLocaleDateString());
   }
 
-  get dateRange(): { from: Date; to: Date } {
-    return this.dates.length >= this.MIN_BLOCK_COUNT_BEFORE_SHOWING_SLIDER
-      ? {
-          from: this.startDate,
-          to: this.endDate
-        }
-      : {
-          from: new Date(0, 0),
-          to: new Date(10000, 0)
-        };
-  }
-
   constructor(private modalService: ModalService, public dataService: DataService) {}
+
+  ngOnInit(): void {
+    this.page$.subscribe(value => {
+      if (value) {
+        this.towers = value.towers.map((t, index) => {
+          if (index < this.towers.length) {
+            if (this.towers[index].getValue() !== t) {
+              this.towers[index].next(t);
+            }
+            return this.towers[index];
+          }
+          return new BehaviorSubject(t);
+        });
+
+        this.page = value;
+        this.dates = value.towers
+          .reduce((all, t) => [...t.blocks.map(b => b.created), ...all], [])
+          .sort((d1, d2) => d1.getTime() - d2.getTime());
+      }
+    });
+  }
 
   dropDrag(event: any) {
     this.page.moveTower(event);
@@ -87,11 +91,5 @@ export class PageComponent {
     } catch {
       // pass
     }
-  }
-
-  private updateDates() {
-    this.dates = this.page.towers
-      .reduce((all, t) => [...t.blocks.map(b => b.created), ...all], [])
-      .sort((d1, d2) => d1.getTime() - d2.getTime());
   }
 }

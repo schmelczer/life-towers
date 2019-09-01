@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { ModalService } from '../../../../services/modal.service';
 import { DataService } from '../../../../services/data.service';
 import { Page } from '../../../../model/page';
@@ -8,8 +8,10 @@ import { Page } from '../../../../model/page';
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss']
 })
-export class SettingsComponent {
-  constructor(public modalService: ModalService, public dataService: DataService) {
+export class SettingsComponent implements OnInit {
+  constructor(public modalService: ModalService, public dataService: DataService) {}
+
+  ngOnInit() {
     this.modalService.active.input.subscribe(p => (this.page = p));
   }
 

@@ -49,13 +49,13 @@ export class StoreService<T> {
               isDone: false
             },
             {
-              created: new Date(2020, 2, 15),
+              created: new Date(2019, 3, 15),
               tag: 'go to school',
               description: 'done it',
               isDone: true
             },
             {
-              created: new Date(2021, 2, 15),
+              created: new Date(2019, 3, 15, 19),
               tag: 'go to school',
               isDone: false
             }

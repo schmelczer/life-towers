@@ -2,8 +2,8 @@
   <!-- wrapper for easier styling -->
   <app-select-add
     [options]="pageNames"
-    [default]="selectedPageName"
-    (value)="selectPage($event)"
+    [default]="(selectedPage$ | async).name"
+    (value)="selectedPageName = $event"
     [placeholder]="'Add a new page…'"
   ></app-select-add>
 </div>
@@ -11,7 +11,7 @@
 
 <div class="page-container">
   <!-- wrapper for easier styling -->
-  <app-page *ngIf="selectedPage" [page]="selectedPage" (isDragHappening)="isDragHappening = $event"></app-page>
+  <app-page [page$]="selectedPage$" (isDragHappening)="isDragHappening = $event"></app-page>
 </div>
 <!-- wrapper for easier styling -->
 
