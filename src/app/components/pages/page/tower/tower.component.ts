@@ -49,13 +49,18 @@ export class TowerComponent implements OnInit {
           });
 
         if (this.tower) {
+          console.log(this.tower, this.tower.latestVersion, value);
+        }
+        if (this.tower && this.tower.latestVersion === value) {
           let difference = this.tower.blocks.map((b, index) => {
             return b === value.blocks[index];
           });
 
+          console.log(this.tower.blocks);
           if (
-            (difference.every(i => i) && this.tower.blocks.length < value.blocks.length) ||
-            this.tower.blocks.filter(b => b.isDone).length + 1 === value.blocks.filter(b => b.isDone).length
+            (difference.every(i => i) && this.tower.blocks.length + 1 === value.blocks.length) ||
+            (this.tower.blocks.length === value.blocks.length &&
+              this.tower.blocks.filter(b => b.isDone).length + 1 === value.blocks.filter(b => b.isDone).length)
           ) {
             const lastBlock = top(this.blocks);
             if (lastBlock) {

@@ -2,8 +2,8 @@
   <!-- wrapper for easier styling -->
   <app-select-add
     [options]="pageNames"
-    [default]="(selectedPage$ | async).name"
-    (value)="selectedPageName = $event"
+    [default]="(selectedPage$ | async)?.name"
+    (value)="selectPage($event)"
     [placeholder]="'Add a new page…'"
   ></app-select-add>
 </div>

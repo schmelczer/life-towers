@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Page } from '../../model/page';
 import { DataService } from '../../services/data.service';
 import { ModalService } from '../../services/modal.service';
@@ -12,7 +12,7 @@ const USER_DATA_KEY = 'life-towers.user-data.v.2';
   templateUrl: './pages.component.html',
   styleUrls: ['./pages.component.scss']
 })
-export class PagesComponent {
+export class PagesComponent implements OnInit {
   @ViewChild('top') top: ElementRef;
   @ViewChild('page') page: ElementRef;
   @ViewChild('bottom') bottom: ElementRef;
@@ -27,37 +27,57 @@ export class PagesComponent {
     return [];
   }
 
-  set selectedPageName(value: string) {
-    window.localStorage.setItem(
-      USER_DATA_KEY,
-      JSON.stringify({
-        selectedPage: value
-      })
-    );
-    const index = this.pageNames.indexOf(value);
-    this._selectedPage.next(index >= 0 ? this.pages[0] : null);
-  }
+  selectedPageName: string;
 
   private readonly _selectedPage: BehaviorSubject<Page> = new BehaviorSubject(null);
   readonly selectedPage$: Observable<Page> = this._selectedPage.asObservable();
 
   constructor(public dataService: DataService, private modalService: ModalService) {
     const userData = JSON.parse(window.localStorage.getItem(USER_DATA_KEY));
-    if (userData !== null && userData.selectedPage !== undefined) {
+    if (userData !== null) {
       this.selectedPageName = userData.selectedPage;
     }
+  }
 
+  ngOnInit() {
     this.dataService.children$.subscribe(pages => {
       if (pages) {
-        this.pages = pages;
-        if (!this._selectedPage.getValue() && this.pages.length > 0) {
-          this.selectedPageName = this.pages[0].name;
-        } else if (this._selectedPage.getValue()) {
-          // To trigger update on new page.
-          this.selectedPageName = this._selectedPage.getValue().name;
+        if (this.pages && this.pages.length - 1 === pages.length) {
+          this.selectedPageName = null;
         }
+        this.pages = pages;
+        this.selectPage(this.selectedPageName);
       }
     });
+  }
+
+  selectPage(name: string) {
+    console.log(name);
+    if (!name) {
+      if (this.pages && this.pages.length > 0) {
+        name = this.pages[0].name;
+      }
+    }
+    this.selectedPageName = name;
+
+    window.localStorage.setItem(
+      USER_DATA_KEY,
+      JSON.stringify({
+        selectedPage: name
+      })
+    );
+
+    if (this.pages && name) {
+      if (!this.pageNames.includes(name)) {
+        this.dataService.addPage(name);
+      }
+
+      const index = this.pageNames.indexOf(name);
+      this._selectedPage.next(this.pages[index]);
+      return;
+    }
+
+    this._selectedPage.next(null);
   }
 
   async openSettings() {
