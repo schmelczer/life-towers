@@ -1,11 +1,9 @@
 import { Node } from './node';
-import { observableToBeFn } from 'rxjs/internal/testing/TestScheduler';
 
 export abstract class InnerNode extends Node {
-  parent: Node;
-  nextVersion: this = null;
-
-  protected readonly children: Array<InnerNode> = [];
+  readonly children: Array<InnerNode> = [];
+  protected parent: Node;
+  private nextVersion: this = null;
 
   get latestVersion(): this {
     let version;
@@ -13,16 +11,6 @@ export abstract class InnerNode extends Node {
       // pass
     }
     return version;
-  }
-
-  protected constructor(parent: Node) {
-    super();
-
-    new Promise(r => r()).then(() =>
-      parent.addChild({
-        value: this
-      })
-    );
   }
 
   mutatedUpdate() {
@@ -33,30 +21,20 @@ export abstract class InnerNode extends Node {
     return this.update((self: this) => this.cloneWithMap.call(self, map));
   }
 
-  changeKey({ propertyName, value }: { propertyName: string; value: any }): this {
-    return this.update((self: this) => this.cloneWithAdd.call(self, { propertyName, value }));
-  }
-
   changeKeys(props: { [propertyName: string]: any }): this {
     return this.update((self: this) => this.cloneWithChangedKeys.call(self, props));
   }
 
-  changeValue({ oldValue, newValue }: { oldValue: any; newValue: any }): this {
-    return this.update((self: this) => this.cloneWithModify.call(self, { oldValue, newValue }));
-  }
-
-  addChild(update: { value: InnerNode }) {
+  addChild(update: { child: InnerNode }) {
     super.addChild.call(this.latestVersion, update);
   }
 
   changeChild(update: { oldValue: InnerNode; newValue: InnerNode }) {
-    super.changeChild.call(this.latestVersion, update);
+    super.replaceChild.call(this.latestVersion, update);
   }
 
   protected abstract cloneWithMap(map: (a: this) => void): this;
-  protected abstract cloneWithAdd(update: { value: any; propertyName: string }): this;
   protected abstract cloneWithChangedKeys(props: { [propertyName: string]: any }): this;
-  protected abstract cloneWithModify(update: { oldValue: any; newValue: any }): this;
 
   private update(cloneMethod: (self: this) => this): this {
     if (this.nextVersion !== null) {
@@ -72,7 +50,7 @@ export abstract class InnerNode extends Node {
       child.parent = clone;
     }
 
-    this.parent.changeChild({
+    this.parent.replaceChild({
       oldValue: this,
       newValue: clone
     });

@@ -1,36 +1,32 @@
 import { InnerNode } from './inner-node';
+import { Unique } from './unique';
 
-export abstract class Node {
-  protected static id = 0;
-  protected static sumCopyCount = 0;
-  protected abstract readonly children: Array<InnerNode>;
-  private id = Node.id++;
-  protected copyCount = 1;
-
-  abstract changeKey(update: { propertyName: string; value: any });
-  abstract changeValue(update: { oldValue: any; newValue: any });
-
-  constructor() {
-    Node.sumCopyCount++;
-  }
-
+export abstract class Node extends Unique {
+  readonly children: Array<InnerNode>;
+  // TODO: fix types.
+  protected abstract changeKeys(props: any): this;
   abstract mutatedUpdate(): void;
 
-  addChild(update: { value: InnerNode }) {
-    this.changeValue({
-      oldValue: this.children,
-      newValue: [...this.children, update.value]
+  private copyCount = 0;
+
+  protected initiate() {
+    super.initiate();
+    this.copyCount++;
+  }
+
+  addChild({ child }: { child: InnerNode }) {
+    this.changeKeys({
+      children: [...this.children, child]
     });
   }
 
-  changeChild({ oldValue, newValue }: { oldValue: InnerNode; newValue: InnerNode }) {
+  replaceChild({ oldValue, newValue }: { oldValue: InnerNode; newValue: InnerNode }) {
     if (oldValue === newValue) {
       return;
     }
 
-    this.changeValue({
-      oldValue: this.children,
-      newValue: this.children.map(c => (c === oldValue ? newValue : c))
+    this.changeKeys({
+      children: this.children.map(c => (c === oldValue ? newValue : c))
     });
   }
 
@@ -45,6 +41,6 @@ export abstract class Node {
 
   public log() {
     console.log(this._log());
-    console.log(`All in all, there are ${Node.sumCopyCount} objects.`);
+    console.log(`All in all, there are ${Unique.ObjectCount} objects.`);
   }
 }
