@@ -1,17 +1,12 @@
 import { Serializable } from './serializable';
 import { IPage } from '../interfaces/persistance/page';
 import { Tower } from './tower';
-import { Node } from '../store/node';
+import { InnerNodeState } from '../store/inner-node';
 
-export class Page extends Serializable implements IPage {
-  constructor(parent: Node, props: IPage) {
-    super(parent, props, 'Page');
-  }
+export interface PageState extends InnerNodeState, IPage {}
 
+export class Page extends Serializable implements IPage, PageState {
   readonly name: string;
-  get towers(): Array<Tower> {
-    return this.children as Array<Tower>;
-  }
 
   readonly userData: {
     hideCreateTowerButton: boolean;
@@ -21,10 +16,17 @@ export class Page extends Serializable implements IPage {
     };
   };
 
+  constructor(props: IPage) {
+    super(props, 'Page');
+  }
+
+  get towers(): Array<Tower> {
+    return this.children as Array<Tower>;
+  }
+
   setHideCreateTowerButton(value: boolean) {
-    this.changeKey({
-      propertyName: 'userData',
-      value: {
+    this.changeKeys<PageState>({
+      userData: {
         ...this.userData,
         hideCreateTowerButton: value
       }
@@ -41,9 +43,8 @@ export class Page extends Serializable implements IPage {
     towers.splice(previousIndex, 1);
     towers.splice(currentIndex, 0, tower);
 
-    this.changeValue({
-      oldValue: this.towers,
-      newValue: towers
+    this.changeKeys<PageState>({
+      children: towers
     });
   }
 
@@ -53,17 +54,18 @@ export class Page extends Serializable implements IPage {
       hue = Math.random() * 360;
     } while (30 <= hue && hue <= 200);
 
-    new Tower(this, {
-      name,
-      blocks: [],
-      baseColor: { h: hue, s: 100, l: 50 }
-    });
+    this.addChildren([
+      new Tower({
+        name,
+        blocks: [],
+        baseColor: { h: hue, s: 100, l: 50 }
+      })
+    ]);
   }
 
   removeTower(tower: Tower) {
-    this.changeValue({
-      oldValue: this.towers,
-      newValue: this.towers.filter(t => t !== tower)
+    this.changeKeys<PageState>({
+      towers: this.towers.filter(t => t !== tower)
     });
   }
 }

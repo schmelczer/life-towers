@@ -1,10 +1,6 @@
-import { Cloneable } from '../store/cloneable';
-import { Node } from '../store/node';
+import { InnerNode } from '../store/inner-node';
 
-export class Serializable extends Cloneable {
-  protected type: string;
-
-  private static propertyList: any = {};
+export class Serializable extends InnerNode {
   static childrenMap: {
     [type: string]: {
       childrenConstructor: typeof Serializable;
@@ -13,12 +9,11 @@ export class Serializable extends Cloneable {
     };
   };
 
-  protected onAfterClone(): void {
-    // pass
-  }
+  private static propertyList: any = {};
+  protected type: string;
 
-  protected constructor(parent: Node, properties: any, type: string) {
-    super(parent);
+  protected constructor(properties: any, type: string) {
+    super();
 
     const compiledType = this.constructor.name;
     if (!Serializable.propertyList.hasOwnProperty(compiledType)) {
@@ -28,16 +23,15 @@ export class Serializable extends Cloneable {
       if (properties.hasOwnProperty(property)) {
         const propertyValue = properties[property];
         // This should be ran after the original constructor has finished.
-        console.log(type);
         if (property === Serializable.childrenMap[type].childrenListName) {
           new Promise(r => r()).then(() => {
-            for (let child of propertyValue) {
-              new Serializable.childrenMap[type].childrenConstructor(
-                this,
-                child,
-                Serializable.childrenMap[type].childrenType
-              );
-            }
+            const children = propertyValue.map(
+              c =>
+                new Serializable.childrenMap[type].childrenConstructor(c, Serializable.childrenMap[type].childrenType)
+            );
+            console.log(type, 'created');
+            this.addChildren(children);
+            console.log(type, 'added');
           });
         } else {
           this[property] = properties[property];

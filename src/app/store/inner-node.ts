@@ -1,9 +1,18 @@
-import { Node } from './node';
+import { Node, NodeState } from './node';
 
-export abstract class InnerNode extends Node {
-  readonly children: Array<InnerNode> = [];
-  protected parent: Node;
+export interface InnerNodeState extends NodeState {
+  dummy: any;
+}
+
+export class InnerNode extends Node implements InnerNodeState {
+  readonly dummy = 3;
+  parent: Node;
   private nextVersion: this = null;
+  readonly children: Array<InnerNode> = [];
+
+  constructor() {
+    super();
+  }
 
   get latestVersion(): this {
     let version;
@@ -13,40 +22,34 @@ export abstract class InnerNode extends Node {
     return version;
   }
 
-  mutatedUpdate() {
-    this.parent.mutatedUpdate();
+  addChildren(children: Array<InnerNode>) {
+    super.addChildren.call(this.latestVersion, children);
   }
 
-  map(map: (a: this) => void) {
-    return this.update((self: this) => this.cloneWithMap.call(self, map));
-  }
-
-  changeKeys(props: { [propertyName: string]: any }): this {
-    return this.update((self: this) => this.cloneWithChangedKeys.call(self, props));
-  }
-
-  addChild(update: { child: InnerNode }) {
-    super.addChild.call(this.latestVersion, update);
-  }
-
-  changeChild(update: { oldValue: InnerNode; newValue: InnerNode }) {
+  replaceChild(update: { oldValue: InnerNode; newValue: InnerNode }) {
     super.replaceChild.call(this.latestVersion, update);
   }
 
-  protected abstract cloneWithMap(map: (a: this) => void): this;
-  protected abstract cloneWithChangedKeys(props: { [propertyName: string]: any }): this;
-
-  private update(cloneMethod: (self: this) => this): this {
+  changeKeys<T extends NodeState>(props: Partial<T>): this {
     if (this.nextVersion !== null) {
-      this.latestVersion.update(cloneMethod);
+      this.latestVersion.changeKeys(props);
     }
 
-    const clone = cloneMethod(this);
-    if (clone === this) {
-      return this;
+    const clone = this.cloneWithChangedKeys(props);
+
+    let shouldClone = false;
+    for (const prop in props) {
+      // @ts-ignore
+      if (props.hasOwnProperty(prop) && props[prop] !== this[prop]) {
+        shouldClone = true;
+        break;
+      }
+    }
+    if (!shouldClone) {
+      return;
     }
 
-    for (let child of clone.children) {
+    for (const child of clone.children) {
       child.parent = clone;
     }
 
@@ -56,6 +59,30 @@ export abstract class InnerNode extends Node {
     });
 
     this.nextVersion = clone;
+    return clone;
+  }
+
+  protected onAfterClone() {}
+
+  protected cloneWithChangedKeys<T extends NodeState>(props: Partial<T>): this {
+    const insides = Object.getOwnPropertyDescriptors(this);
+
+    for (const key in props) {
+      if (props.hasOwnProperty(key)) {
+        if (insides.hasOwnProperty(key)) {
+          insides[key].value = props[key];
+        } else {
+          // @ts-ignore
+          insides[key] = {
+            value: props[key]
+          };
+        }
+      }
+    }
+
+    const clone = Object.create(Object.getPrototypeOf(this), insides);
+    clone.initiate();
+    clone.onAfterClone();
     return clone;
   }
 }

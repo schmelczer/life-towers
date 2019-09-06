@@ -6,10 +6,10 @@ export abstract class Unique extends Initiable {
     return Unique.nextId;
   }
 
+  private _id: number;
   get id(): number {
     return this._id;
   }
-  private _id: number;
 
   protected initiate() {
     this._id = Unique.nextId++;

@@ -1,22 +1,24 @@
-import { InnerNode } from './inner-node';
 import { Unique } from './unique';
+import { InnerNode } from './inner-node';
 
-export abstract class Node extends Unique {
-  readonly children: Array<InnerNode>;
-  // TODO: fix types.
-  protected abstract changeKeys(props: any): this;
-  abstract mutatedUpdate(): void;
+export interface NodeState {
+  children: Array<InnerNode>;
+}
 
-  private copyCount = 0;
+export abstract class Node extends Unique implements NodeState {
+  protected copyCount = 1;
+  abstract readonly children: Array<InnerNode>;
+
+  protected abstract changeKeys<T extends NodeState>(props: Partial<T>): this;
 
   protected initiate() {
     super.initiate();
-    this.copyCount++;
+    ++this.copyCount;
   }
 
-  addChild({ child }: { child: InnerNode }) {
-    this.changeKeys({
-      children: [...this.children, child]
+  addChildren(children: Array<InnerNode>) {
+    this.changeKeys<NodeState>({
+      children: [...this.children, ...children]
     });
   }
 
@@ -25,7 +27,7 @@ export abstract class Node extends Unique {
       return;
     }
 
-    this.changeKeys({
+    this.changeKeys<NodeState>({
       children: this.children.map(c => (c === oldValue ? newValue : c))
     });
   }
@@ -33,7 +35,7 @@ export abstract class Node extends Unique {
   protected _log(indent = ''): string {
     const basicInfo = `${indent} - ${this.constructor.name}, #${this.id}`;
     let response = `${basicInfo}${' '.repeat(25 - basicInfo.length)}siblings: ${this.copyCount}\n`;
-    for (let c of this.children) {
+    for (const c of this.children) {
       response += `${c._log(indent + '  ')}`;
     }
     return response;

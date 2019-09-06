@@ -13,16 +13,36 @@ import { Observable } from 'rxjs/internal/Observable';
   providedIn: 'root'
 })
 export class DataService extends Root<Page> {
-  get pages(): Array<Page> {
-    return this.children;
-  }
-
   private readonly _safeChildren: BehaviorSubject<Array<Page>> = new BehaviorSubject(null);
   readonly safeChildren$: Observable<Array<Page>> = this._safeChildren.asObservable();
 
   constructor(private storeService: StoreService<Array<IPage>>) {
     super();
     this.init().catch();
+  }
+
+  get pages(): Array<Page> {
+    return this.children;
+  }
+
+  save(timeout: number) {
+    this.storeService.scheduleSave(this.pages, timeout);
+  }
+
+  addPage(name: string) {
+    const page = new Page({
+      name,
+      userData: {},
+      towers: []
+    });
+    this.addChildren([page]);
+    page.addTower();
+  }
+
+  removePage(page: Page) {
+    this.changeKeys<any>({
+      children: this.children.filter(c => c !== page)
+    });
   }
 
   private async init() {
@@ -44,43 +64,15 @@ export class DataService extends Root<Page> {
         childrenType: null
       }
     };
+    this.children$.subscribe(value => {
+      this.log();
+    });
 
-    for (let page of pages) {
-      new Page(this, page);
-    }
-    setTimeout(() => {
-      this.children$.subscribe(value => {
-        this.log();
-      });
-    }, 0);
+    this.addChildren(pages.map(p => new Page(p)));
 
     this.children$.subscribe(value => {
       this._safeChildren.next(value);
       this.save(0);
-    });
-  }
-
-  mutatedUpdate() {
-    this.save(2500);
-  }
-
-  save(timeout: number) {
-    this.storeService.scheduleSave(this.pages, timeout);
-  }
-
-  addPage(name: string) {
-    const page = new Page(this, {
-      name,
-      userData: {},
-      towers: []
-    });
-    page.addTower();
-  }
-
-  removePage(page: Page) {
-    this.changeValue({
-      oldValue: this.children,
-      newValue: this.children.filter(c => c !== page)
     });
   }
 }

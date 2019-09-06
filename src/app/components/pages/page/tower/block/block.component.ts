@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { Block } from '../../../../../model/block';
+import { Block, BlockState } from '../../../../../model/block';
 import { ModalService } from '../../../../../services/modal.service';
 import { ColoredBlock, Tower } from '../../../../../model/tower';
 
@@ -23,7 +23,7 @@ export class BlockComponent {
         isDone: this.block.isDone
       });
       console.log(description);
-      this.block.changeProperties({
+      this.block.changeKeys<BlockState>({
         tag: selected,
         description,
         isDone

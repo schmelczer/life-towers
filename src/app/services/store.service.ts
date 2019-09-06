@@ -95,7 +95,7 @@ export class StoreService<T> {
 
   constructor() {
     const localStorageData = localStorage.getItem(LOCAL_STORAGE_KEY);
-    this.storedData = JSON.parse(localStorageData ? localStorageData : this.mockData) as T;
+    this.storedData = JSON.parse(false ? localStorageData : this.mockData) as T;
   }
 
   scheduleSave(data: T, timeout: number) {

@@ -1,5 +1,5 @@
 import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
-import { Block } from '../../../../../model/block';
+import { Block, BlockState } from '../../../../../model/block';
 import { Tower } from '../../../../../model/tower';
 import { ModalService } from '../../../../../services/modal.service';
 import { CancelService } from '../../../../../services/cancel.service';
@@ -55,7 +55,7 @@ export class TasksComponent implements OnInit {
         change.created = new Date();
       }
 
-      block.changeProperties(change);
+      block.changeKeys<BlockState>(change);
     } catch {
       // pass
     }

@@ -23,6 +23,8 @@ import { RemoveBlockComponent } from './components/modal/modals/remove-block/rem
 import { ToggleComponent } from './components/shared/toggle/toggle.component';
 import { TasksComponent } from './components/pages/page/tower/tasks/tasks.component';
 import { ColorPipe } from './pipes/color.pipe';
+import { Root } from './store/root';
+import { InnerNode, InnerNodeState } from './store/inner-node';
 
 @NgModule({
   declarations: [

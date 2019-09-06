@@ -3,16 +3,16 @@ import { lighten } from '../utils/color';
 import { Block } from './block';
 import { Serializable } from './serializable';
 import { hash } from '../utils/hash';
-import { Node } from '../store/node';
 import { IColor } from '../interfaces/color';
+import { InnerNodeState } from '../store/inner-node';
 
 export type ColoredBlock = Block & { color: IColor };
 
-export class Tower extends Serializable implements ITower {
-  protected type = 'Tower';
+export interface TowerState extends ITower, InnerNodeState {}
 
+export class Tower extends Serializable implements ITower, TowerState {
   tags: string[];
-  name: string;
+  readonly name: string;
 
   get blocks(): Array<Block> {
     return this.children as Array<Block>;
@@ -22,12 +22,11 @@ export class Tower extends Serializable implements ITower {
 
   readonly baseColor: IColor;
 
-  constructor(parent: Node, props: ITower) {
-    super(parent, props, 'Tower');
-    this.onAfterClone();
+  constructor(props: ITower) {
+    super(props, 'Tower');
   }
 
-  protected onAfterClone(): void {
+  protected onAfterClone() {
     this.blocks.sort((a, b) => {
       return a.created.getTime() - b.created.getTime();
     });
@@ -47,15 +46,15 @@ export class Tower extends Serializable implements ITower {
   }
 
   addBlock(props: { tag: string; description: string; isDone: boolean }) {
-    new Block(this, {
-      created: new Date(),
-      ...props
-    });
+    this.addChildren([
+      new Block({
+        created: new Date(),
+        ...props
+      })
+    ]);
   }
 
-  changeName(newName: string) {
-    // For optimization purposes.
-    this.name = newName;
-    this.mutatedUpdate();
+  changeName(name: string) {
+    this.changeKeys<TowerState>({ name });
   }
 }
