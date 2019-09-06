@@ -12,8 +12,8 @@ export class Serializable extends InnerNode {
   private static propertyList: any = {};
   protected type: string;
 
-  protected constructor(properties: any, type: string) {
-    super();
+  protected constructor(properties: any, type: string, children?: Array<InnerNode>) {
+    super(children);
 
     const compiledType = this.constructor.name;
     if (!Serializable.propertyList.hasOwnProperty(compiledType)) {
@@ -21,19 +21,7 @@ export class Serializable extends InnerNode {
     }
     for (const property in properties) {
       if (properties.hasOwnProperty(property)) {
-        const propertyValue = properties[property];
-        // This should be ran after the original constructor has finished.
-        if (property === Serializable.childrenMap[type].childrenListName) {
-          new Promise(r => r()).then(() => {
-            const children = propertyValue.map(
-              c =>
-                new Serializable.childrenMap[type].childrenConstructor(c, Serializable.childrenMap[type].childrenType)
-            );
-            console.log(type, 'created');
-            this.addChildren(children);
-            console.log(type, 'added');
-          });
-        } else {
+        if (property !== Serializable.childrenMap[type].childrenListName) {
           this[property] = properties[property];
         }
 

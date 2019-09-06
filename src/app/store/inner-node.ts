@@ -10,8 +10,9 @@ export class InnerNode extends Node implements InnerNodeState {
   private nextVersion: this = null;
   readonly children: Array<InnerNode> = [];
 
-  constructor() {
+  constructor(children?: Array<InnerNode>) {
     super();
+    this.children = children ? children : [];
   }
 
   get latestVersion(): this {
@@ -22,12 +23,12 @@ export class InnerNode extends Node implements InnerNodeState {
     return version;
   }
 
-  addChildren(children: Array<InnerNode>) {
-    super.addChildren.call(this.latestVersion, children);
+  addChildren(children: Array<InnerNode>): this {
+    return super.addChildren.call(this.latestVersion, children);
   }
 
-  replaceChild(update: { oldValue: InnerNode; newValue: InnerNode }) {
-    super.replaceChild.call(this.latestVersion, update);
+  replaceChild(update: { oldValue: InnerNode; newValue: InnerNode }): this {
+    return super.replaceChild.call(this.latestVersion, update);
   }
 
   changeKeys<T extends NodeState>(props: Partial<T>): this {

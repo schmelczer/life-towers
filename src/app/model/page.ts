@@ -1,7 +1,7 @@
 import { Serializable } from './serializable';
 import { IPage } from '../interfaces/persistance/page';
 import { Tower } from './tower';
-import { InnerNodeState } from '../store/inner-node';
+import { InnerNode, InnerNodeState } from '../store/inner-node';
 
 export interface PageState extends InnerNodeState, IPage {}
 
@@ -17,7 +17,7 @@ export class Page extends Serializable implements IPage, PageState {
   };
 
   constructor(props: IPage) {
-    super(props, 'Page');
+    super(props, 'Page', props.towers.map(t => new Tower(t)));
   }
 
   get towers(): Array<Tower> {

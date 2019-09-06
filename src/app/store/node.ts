@@ -9,25 +9,28 @@ export abstract class Node extends Unique implements NodeState {
   protected copyCount = 1;
   abstract readonly children: Array<InnerNode>;
 
+  protected constructor() {
+    super();
+  }
   protected abstract changeKeys<T extends NodeState>(props: Partial<T>): this;
 
   protected initiate() {
     super.initiate();
-    ++this.copyCount;
+    this.copyCount++;
   }
 
-  addChildren(children: Array<InnerNode>) {
-    this.changeKeys<NodeState>({
+  addChildren(children: Array<InnerNode>): this {
+    return this.changeKeys<NodeState>({
       children: [...this.children, ...children]
     });
   }
 
-  replaceChild({ oldValue, newValue }: { oldValue: InnerNode; newValue: InnerNode }) {
+  replaceChild({ oldValue, newValue }: { oldValue: InnerNode; newValue: InnerNode }): this {
     if (oldValue === newValue) {
-      return;
+      return this;
     }
 
-    this.changeKeys<NodeState>({
+    return this.changeKeys<NodeState>({
       children: this.children.map(c => (c === oldValue ? newValue : c))
     });
   }

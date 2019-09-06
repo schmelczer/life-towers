@@ -93,7 +93,7 @@ export class DoubleSliderComponent {
   }
 
   private emitValue() {
-    const range = {
+    this.range.emit({
       from:
         this.oneValue < this.otherValue
           ? this.values[this.indexFromValue(this.oneValue)]
@@ -102,7 +102,6 @@ export class DoubleSliderComponent {
         this.oneValue < this.otherValue
           ? this.values[this.indexFromValue(this.otherValue)]
           : this.values[this.indexFromValue(this.oneValue)]
-    };
-    this.range.emit(range);
+    });
   }
 }

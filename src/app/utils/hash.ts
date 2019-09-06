@@ -4,8 +4,7 @@ export const hash = (text: string): number => {
     return 0;
   }
   const hashValue = Array.prototype.reduce.call(
-    // tslint:disable-next-line:no-bitwise
-    text,
+    text, // tslint:disable-next-line:no-bitwise
     (value, char) => ((value << 5) - value + (char.charCodeAt(0) as number)) | 0,
     7
   );

@@ -9,13 +9,12 @@ import { Page } from '../../../../model/page';
   styleUrls: ['./settings.component.scss']
 })
 export class SettingsComponent implements OnInit {
+  page: Page;
   constructor(public modalService: ModalService, public dataService: DataService) {}
 
   ngOnInit() {
     this.modalService.active.input.subscribe(p => (this.page = p));
   }
-
-  page: Page;
 
   async deletePage() {
     try {

@@ -13,9 +13,6 @@ import { Observable } from 'rxjs/internal/Observable';
   providedIn: 'root'
 })
 export class DataService extends Root<Page> {
-  private readonly _safeChildren: BehaviorSubject<Array<Page>> = new BehaviorSubject(null);
-  readonly safeChildren$: Observable<Array<Page>> = this._safeChildren.asObservable();
-
   constructor(private storeService: StoreService<Array<IPage>>) {
     super();
     this.init().catch();
@@ -66,13 +63,9 @@ export class DataService extends Root<Page> {
     };
     this.children$.subscribe(value => {
       this.log();
+      this.save(0);
     });
 
     this.addChildren(pages.map(p => new Page(p)));
-
-    this.children$.subscribe(value => {
-      this._safeChildren.next(value);
-      this.save(0);
-    });
   }
 }

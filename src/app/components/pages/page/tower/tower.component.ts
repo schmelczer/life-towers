@@ -41,7 +41,7 @@ export class TowerComponent implements OnInit {
         this.blocks = value.coloredBlocks
           .filter(b => b.isDone)
           .map(b => {
-            let classedBlock = b as StyledBlock;
+            const classedBlock = b as StyledBlock;
             classedBlock.shouldDraw = true;
             classedBlock.style = { transform: 'translateY(0)', opacity: '1' };
             classedBlock.cssClass = '';
@@ -52,7 +52,7 @@ export class TowerComponent implements OnInit {
           console.log(this.tower, this.tower.latestVersion, value);
         }
         if (this.tower && this.tower.latestVersion === value) {
-          let difference = this.tower.blocks.map((b, index) => {
+          const difference = this.tower.blocks.map((b, index) => {
             return b === value.blocks[index];
           });
 

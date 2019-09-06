@@ -4,7 +4,7 @@ import { Block } from './block';
 import { Serializable } from './serializable';
 import { hash } from '../utils/hash';
 import { IColor } from '../interfaces/color';
-import { InnerNodeState } from '../store/inner-node';
+import { InnerNode, InnerNodeState } from '../store/inner-node';
 
 export type ColoredBlock = Block & { color: IColor };
 
@@ -23,7 +23,8 @@ export class Tower extends Serializable implements ITower, TowerState {
   readonly baseColor: IColor;
 
   constructor(props: ITower) {
-    super(props, 'Tower');
+    super(props, 'Tower', props.blocks.map(b => new Block(b)));
+    this.onAfterClone();
   }
 
   protected onAfterClone() {
