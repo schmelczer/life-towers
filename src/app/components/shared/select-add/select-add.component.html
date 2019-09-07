@@ -16,7 +16,7 @@
         (keyup)="handleKeys($event)"
       />
 
-      <button *ngIf="options.length <= maxItemCount" (click)="addNewOption()">Add</button>
+      <button *ngIf="options.length <= maxItemCount" (click)="addNewOption()" [disabled]="!newOption">Add</button>
     </div>
   </div>
 

@@ -1,7 +1,6 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { Page } from '../../../model/page';
 import { ModalService } from '../../../services/modal.service';
-import { DataService } from '../../../services/data.service';
 import { Observable } from 'rxjs/internal/Observable';
 import { Range } from '../../../interfaces/range';
 import { Subject } from 'rxjs/internal/Subject';
@@ -34,7 +33,7 @@ export class PageComponent implements OnInit {
     return this.dates.map(d => d.toLocaleDateString());
   }
 
-  constructor(private modalService: ModalService, public dataService: DataService) {}
+  constructor(private modalService: ModalService) {}
 
   ngOnInit(): void {
     this.page$.subscribe(value => {

@@ -12,7 +12,7 @@ export class Serializable extends InnerNode {
   private static propertyList: any = {};
   protected type: string;
 
-  protected constructor(properties: any, type: string, children?: Array<InnerNode>) {
+  protected constructor(properties: any, type: string, children: Array<InnerNode> = []) {
     super(children);
 
     const compiledType = this.constructor.name;

@@ -8,11 +8,11 @@ export class InnerNode extends Node implements InnerNodeState {
   readonly dummy = 3;
   parent: Node;
   private nextVersion: this = null;
-  readonly children: Array<InnerNode> = [];
+  readonly children: Array<InnerNode>;
 
-  constructor(children?: Array<InnerNode>) {
-    super();
-    this.children = children ? children : [];
+  constructor(children: Array<InnerNode> = []) {
+    super(children);
+    this.children = children;
   }
 
   get latestVersion(): this {
@@ -36,9 +36,8 @@ export class InnerNode extends Node implements InnerNodeState {
       this.latestVersion.changeKeys(props);
     }
 
-    const clone = this.cloneWithChangedKeys(props);
-
     let shouldClone = false;
+
     for (const prop in props) {
       // @ts-ignore
       if (props.hasOwnProperty(prop) && props[prop] !== this[prop]) {
@@ -50,16 +49,17 @@ export class InnerNode extends Node implements InnerNodeState {
       return;
     }
 
-    for (const child of clone.children) {
-      child.parent = clone;
-    }
+    const clone = this.cloneWithChangedKeys(props);
+
+    clone.children.forEach(c => (c.parent = clone));
+
+    this.nextVersion = clone;
 
     this.parent.replaceChild({
       oldValue: this,
       newValue: clone
     });
 
-    this.nextVersion = clone;
     return clone;
   }
 
@@ -82,7 +82,7 @@ export class InnerNode extends Node implements InnerNodeState {
     }
 
     const clone = Object.create(Object.getPrototypeOf(this), insides);
-    clone.initiate();
+    clone.setUniqueness();
     clone.onAfterClone();
     return clone;
   }

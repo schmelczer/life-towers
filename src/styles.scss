@@ -21,10 +21,14 @@ $line-height: 2px;
   }
 }
 
-html,
+html {
+  height: 100%;
+  background-color: $text-color;
+}
+
 body {
   height: 100%;
-  background: $background-gradient;
+  background: $background-gradient-opaque;
 }
 
 body {

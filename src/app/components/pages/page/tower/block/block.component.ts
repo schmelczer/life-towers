@@ -22,8 +22,7 @@ export class BlockComponent {
         description: this.block.description,
         isDone: this.block.isDone
       });
-      console.log(description);
-      this.block.changeKeys<BlockState>({
+      this.block.changeKeys({
         tag: selected,
         description,
         isDone

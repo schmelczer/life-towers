@@ -1,8 +1,9 @@
 $accent-color: #a2666f;
-$text-color: #5d576bff;
+$text-color: #5d576b;
 $light-color: #ffffff;
 
-$background-gradient: linear-gradient(90deg, #fff9e077 0, #ffd6d677 100%);
+$background-gradient: linear-gradient(90deg, #fff9e07f 0, #ffd6d67f 100%);
+$background-gradient-opaque: linear-gradient(90deg, #fffcf0 0, #ffebeb 100%);
 
 $shadow: 0 0 1.5px 1.5px rgba(0, 0, 0, 0.1), 0 0 3px 2px rgba(0, 0, 0, 0.05);
 $shadow-border: 0 0 0 0.75px rgba(0, 0, 0, 0.1);

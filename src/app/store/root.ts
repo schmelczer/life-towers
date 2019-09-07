@@ -7,9 +7,9 @@ export class Root<T extends InnerNode> extends Node {
   readonly children$: Observable<Array<T>>;
   private readonly _children: BehaviorSubject<Array<T>>;
 
-  constructor(children?: Array<T>) {
-    super();
-    this._children = new BehaviorSubject(children ? children : []);
+  constructor(children: Array<T> = []) {
+    super(children);
+    this._children = new BehaviorSubject(children);
     this.children$ = this._children.asObservable();
   }
 
@@ -18,7 +18,6 @@ export class Root<T extends InnerNode> extends Node {
   }
 
   set children(value: Array<T>) {
-    console.log(value);
     this._children.next(value);
   }
 

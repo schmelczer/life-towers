@@ -38,6 +38,7 @@ export class TowerComponent implements OnInit {
   ngOnInit() {
     this.tower$.subscribe(value => {
       if (value) {
+        console.log('update');
         this.blocks = value.coloredBlocks
           .filter(b => b.isDone)
           .map(b => {
@@ -48,15 +49,11 @@ export class TowerComponent implements OnInit {
             return classedBlock;
           });
 
-        if (this.tower) {
-          console.log(this.tower, this.tower.latestVersion, value);
-        }
         if (this.tower && this.tower.latestVersion === value) {
           const difference = this.tower.blocks.map((b, index) => {
             return b === value.blocks[index];
           });
 
-          console.log(this.tower.blocks);
           if (
             (difference.every(i => i) && this.tower.blocks.length + 1 === value.blocks.length) ||
             (this.tower.blocks.length === value.blocks.length &&
@@ -64,7 +61,7 @@ export class TowerComponent implements OnInit {
           ) {
             const lastBlock = top(this.blocks);
             if (lastBlock) {
-              lastBlock.style = { opacity: '0' };
+              lastBlock.style = { transform: 'translateY(500%)', opacity: '0' };
               lastBlock.cssClass = 'descend';
               setTimeout(() => (lastBlock.style = { transform: 'translateY(0)', opacity: '1' }), 0);
             }
@@ -72,7 +69,6 @@ export class TowerComponent implements OnInit {
         }
 
         this.tasks = value.coloredBlocks.filter(block => !block.isDone);
-
         this.tower = value;
       }
     });
@@ -91,7 +87,7 @@ export class TowerComponent implements OnInit {
         block.cssClass = 'ascend';
         block.style = { transform: 'translateY(500%)', opacity: '0' };
       }
-      if (block.shouldDraw && block.cssClass === 'ascend' && block.created < newDateRange.to) {
+      if (block.shouldDraw && block.cssClass === 'ascend' && block.created <= newDateRange.to) {
         block.cssClass = 'descend';
         block.style = { transform: 'translateY(0)', opacity: '1' };
       }

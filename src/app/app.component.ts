@@ -10,24 +10,15 @@ import { Root } from './store/root';
 export class AppComponent {
   title = 'life';
 
-  /* tests
   constructor() {
-
-    const root = new Root<InnerNode>();
-    root.log();
-
-    const l = new InnerNode();
-    const r = new InnerNode();
-    root.addChildren([l, r]);
-    root.log();
-
-    const rl = new InnerNode();
+    /*const rl = new InnerNode();
     const rr = new InnerNode();
-    r.addChildren([rl, rr]);
+    const l = new InnerNode();
+    const r = new InnerNode([rl, rr]);
+    const root = new Root<InnerNode>([l, r]);
     root.log();
 
     rr.changeKeys<InnerNodeState>({ dummy: 8 });
-    root.log();
+    root.log();*/
   }
-  */
 }

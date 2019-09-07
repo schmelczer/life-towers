@@ -6,8 +6,6 @@ import { Serializable } from '../model/serializable';
 import { Tower } from '../model/tower';
 import { Block } from '../model/block';
 import { IPage } from '../interfaces/persistance/page';
-import { BehaviorSubject } from 'rxjs/internal/BehaviorSubject';
-import { Observable } from 'rxjs/internal/Observable';
 
 @Injectable({
   providedIn: 'root'
@@ -61,11 +59,14 @@ export class DataService extends Root<Page> {
         childrenType: null
       }
     };
-    this.children$.subscribe(value => {
+    this.children$.subscribe(_ => {
       this.log();
-      this.save(0);
     });
 
     this.addChildren(pages.map(p => new Page(p)));
+
+    this.children$.subscribe(_ => {
+      this.save(0);
+    });
   }
 }

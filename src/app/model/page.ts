@@ -1,9 +1,11 @@
 import { Serializable } from './serializable';
 import { IPage } from '../interfaces/persistance/page';
 import { Tower } from './tower';
-import { InnerNode, InnerNodeState } from '../store/inner-node';
+import { InnerNodeState } from '../store/inner-node';
 
-export interface PageState extends InnerNodeState, IPage {}
+export interface PageState extends InnerNodeState, IPage {
+  towers: Array<Tower>;
+}
 
 export class Page extends Serializable implements IPage, PageState {
   readonly name: string;
@@ -24,8 +26,16 @@ export class Page extends Serializable implements IPage, PageState {
     return this.children as Array<Tower>;
   }
 
+  changeProps(props: Partial<PageState>): this {
+    if (props.hasOwnProperty('towers')) {
+      props.children = props.towers;
+      delete props.towers;
+    }
+    return this.changeKeys<PageState>(props);
+  }
+
   setHideCreateTowerButton(value: boolean) {
-    this.changeKeys<PageState>({
+    this.changeProps({
       userData: {
         ...this.userData,
         hideCreateTowerButton: value
@@ -43,8 +53,8 @@ export class Page extends Serializable implements IPage, PageState {
     towers.splice(previousIndex, 1);
     towers.splice(currentIndex, 0, tower);
 
-    this.changeKeys<PageState>({
-      children: towers
+    this.changeProps({
+      towers
     });
   }
 
@@ -64,7 +74,7 @@ export class Page extends Serializable implements IPage, PageState {
   }
 
   removeTower(tower: Tower) {
-    this.changeKeys<PageState>({
+    this.changeProps({
       towers: this.towers.filter(t => t !== tower)
     });
   }

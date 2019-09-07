@@ -4,27 +4,48 @@ import { Block } from './block';
 import { Serializable } from './serializable';
 import { hash } from '../utils/hash';
 import { IColor } from '../interfaces/color';
-import { InnerNode, InnerNodeState } from '../store/inner-node';
+import { InnerNodeState } from '../store/inner-node';
 
 export type ColoredBlock = Block & { color: IColor };
 
-export interface TowerState extends ITower, InnerNodeState {}
+export interface TowerState extends ITower, InnerNodeState {
+  blocks: Array<Block>;
+}
 
 export class Tower extends Serializable implements ITower, TowerState {
   tags: string[];
   readonly name: string;
-
-  get blocks(): Array<Block> {
-    return this.children as Array<Block>;
-  }
-
   coloredBlocks: Array<ColoredBlock>;
-
   readonly baseColor: IColor;
 
   constructor(props: ITower) {
     super(props, 'Tower', props.blocks.map(b => new Block(b)));
     this.onAfterClone();
+  }
+
+  get blocks(): Array<Block> {
+    return this.children as Array<Block>;
+  }
+
+  changeKeys(props: Partial<TowerState>): this {
+    if (props.hasOwnProperty('blocks')) {
+      props.children = props.blocks;
+      delete props.blocks;
+    }
+    return super.changeKeys<TowerState>(props);
+  }
+
+  addBlock(props: { tag: string; description: string; isDone: boolean }) {
+    this.addChildren([
+      new Block({
+        created: new Date(),
+        ...props
+      })
+    ]);
+  }
+
+  changeName(name: string) {
+    this.changeKeys({ name });
   }
 
   protected onAfterClone() {
@@ -44,18 +65,5 @@ export class Tower extends Serializable implements ITower, TowerState {
         this.tags.push(block.tag);
       }
     }
-  }
-
-  addBlock(props: { tag: string; description: string; isDone: boolean }) {
-    this.addChildren([
-      new Block({
-        created: new Date(),
-        ...props
-      })
-    ]);
-  }
-
-  changeName(name: string) {
-    this.changeKeys<TowerState>({ name });
   }
 }

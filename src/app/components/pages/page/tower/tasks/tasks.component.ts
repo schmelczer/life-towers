@@ -55,7 +55,7 @@ export class TasksComponent implements OnInit {
         change.created = new Date();
       }
 
-      block.changeKeys<BlockState>(change);
+      block.changeKeys(change);
     } catch {
       // pass
     }

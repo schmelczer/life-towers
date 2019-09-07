@@ -6,18 +6,13 @@ export interface NodeState {
 }
 
 export abstract class Node extends Unique implements NodeState {
-  protected copyCount = 1;
   abstract readonly children: Array<InnerNode>;
 
-  protected constructor() {
+  protected constructor(children: Array<InnerNode> = []) {
     super();
+    children.map(c => (c.parent = this));
   }
   protected abstract changeKeys<T extends NodeState>(props: Partial<T>): this;
-
-  protected initiate() {
-    super.initiate();
-    this.copyCount++;
-  }
 
   addChildren(children: Array<InnerNode>): this {
     return this.changeKeys<NodeState>({
@@ -37,7 +32,7 @@ export abstract class Node extends Unique implements NodeState {
 
   protected _log(indent = ''): string {
     const basicInfo = `${indent} - ${this.constructor.name}, #${this.id}`;
-    let response = `${basicInfo}${' '.repeat(25 - basicInfo.length)}siblings: ${this.copyCount}\n`;
+    let response = `${basicInfo}${' '.repeat(25 - basicInfo.length)}copies: ${this.copies}\n`;
     for (const c of this.children) {
       response += `${c._log(indent + '  ')}`;
     }

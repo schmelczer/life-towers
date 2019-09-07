@@ -1,7 +1,10 @@
-import { Initiable } from './initiable';
-
-export abstract class Unique extends Initiable {
+export class Unique {
   protected static nextId = 0;
+
+  constructor() {
+    this.setUniqueness();
+  }
+
   static get ObjectCount(): number {
     return Unique.nextId;
   }
@@ -11,7 +14,13 @@ export abstract class Unique extends Initiable {
     return this._id;
   }
 
-  protected initiate() {
+  private _copies = 0;
+  get copies(): number {
+    return this._copies;
+  }
+
+  protected setUniqueness() {
     this._id = Unique.nextId++;
+    this._copies++;
   }
 }

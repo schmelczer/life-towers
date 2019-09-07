@@ -16,4 +16,8 @@ export class Block extends Serializable implements IBlock, BlockState {
     }
     super(props, 'Block');
   }
+
+  changeKeys(props: Partial<BlockState>): this {
+    return super.changeKeys<BlockState>(props);
+  }
 }

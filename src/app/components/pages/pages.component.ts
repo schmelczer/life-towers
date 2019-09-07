@@ -52,7 +52,6 @@ export class PagesComponent implements OnInit {
   }
 
   selectPage(name: string) {
-    console.log(name);
     if (!name) {
       if (this.pages && this.pages.length > 0) {
         name = this.pages[0].name;
