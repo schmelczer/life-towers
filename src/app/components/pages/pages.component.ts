@@ -51,6 +51,16 @@ export class PagesComponent implements OnInit {
     });
   }
 
+  changeName({ from, to }: { from: string; to: string }) {
+    const page = this.pages.find(p => p.name === from);
+    if (page) {
+      page.changeName(to);
+      if (from === this.selectedPageName) {
+        this.selectPage(to);
+      }
+    }
+  }
+
   selectPage(name: string) {
     if (!name) {
       if (this.pages && this.pages.length > 0) {

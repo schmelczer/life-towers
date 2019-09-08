@@ -1,9 +1,9 @@
-<main class="{{ modalService.active ? 'active' : '' }}" [ngSwitch]="modalService.active?.type">
-  <app-create-block *ngSwitchCase="ModalType.createBlock"></app-create-block>
-  <app-edit-block *ngSwitchCase="ModalType.editBlock"></app-edit-block>
-  <app-remove-block *ngSwitchCase="ModalType.removeBlock"></app-remove-block>
-  <app-remove-tower *ngSwitchCase="ModalType.removeTower"></app-remove-tower>
-  <app-settings *ngSwitchCase="ModalType.settings"></app-settings>
-  <app-get-started *ngSwitchCase="ModalType.getStarted"></app-get-started>
-  <app-remove-page *ngSwitchCase="ModalType.removePage"></app-remove-page>
-</main>
+<section class="{{ modalService.active ? 'active' : '' }}" [ngSwitch]="modalService.active?.type">
+  <app-create-block (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.createBlock"></app-create-block>
+  <app-edit-block (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.editBlock"></app-edit-block>
+  <app-remove-block (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.removeBlock"></app-remove-block>
+  <app-remove-tower (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.removeTower"></app-remove-tower>
+  <app-settings (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.settings"></app-settings>
+  <app-get-started (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.getStarted"></app-get-started>
+  <app-remove-page (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.removePage"></app-remove-page>
+</section>

@@ -4,7 +4,9 @@
     [options]="pageNames"
     [default]="(selectedPage$ | async)?.name"
     (value)="selectPage($event)"
+    (optionChange)="changeName($event)"
     [placeholder]="'Add a new page…'"
+    [editable]="true"
   ></app-select-add>
 </div>
 <!-- wrapper for easier styling -->

@@ -58,6 +58,12 @@ export class Page extends Serializable implements IPage, PageState {
     });
   }
 
+  changeName(to: string) {
+    this.changeProps({
+      name: to
+    });
+  }
+
   addTower(name = '') {
     let hue;
     do {

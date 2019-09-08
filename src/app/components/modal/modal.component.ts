@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { ModalService, ModalType } from '../../services/modal.service';
 
 @Component({
@@ -7,14 +7,18 @@ import { ModalService, ModalType } from '../../services/modal.service';
   styleUrls: ['./modal.component.scss']
 })
 export class ModalComponent {
-  // Needed for accessing the enum from html.
   ModalType = ModalType;
 
-  constructor(public modalService: ModalService) {
+  constructor(public modalService: ModalService, private changeDetectionRef: ChangeDetectorRef) {
     window.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         this.modalService.cancel();
       }
     });
+
+    /*window.addEventListener('resize', (_: UIEvent) => {
+      console.log('resize');
+      this.changeDetectionRef.markForCheck();
+    });*/
   }
 }

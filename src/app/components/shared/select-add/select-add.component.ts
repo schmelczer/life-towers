@@ -12,6 +12,7 @@ export class SelectAddComponent {
   @Input() options: string[];
   @Input() alwaysDropShadow = false;
   @Input() onlyShadowBorder = false;
+  @Input() editable = false;
 
   @Input() set default(value: string) {
     this.selected = value;
@@ -20,7 +21,20 @@ export class SelectAddComponent {
     }
   }
 
+  backgroundHeight: string;
+
+  private _editMode = false;
+  set editMode(value: boolean) {
+    this._editMode = value;
+    this.backgroundHeight = this.getBackgroundHeight();
+  }
+
+  get editMode(): boolean {
+    return this._editMode;
+  }
+
   @Output() value: EventEmitter<string> = new EventEmitter();
+  @Output() optionChange: EventEmitter<{ from: string; to: string }> = new EventEmitter();
 
   @ViewChild('top') top: ElementRef;
   @ViewChild('bottom') bottom: ElementRef;
@@ -32,6 +46,15 @@ export class SelectAddComponent {
   constructor(private cancelService: CancelService) {
     this.cancelService.subscribe(this, () => {
       this.isOpen = false;
+      this.editMode = false;
+    });
+  }
+
+  changeOption(from: string, event) {
+    console.log(event);
+    this.optionChange.emit({
+      from,
+      to: event.target.value
     });
   }
 
@@ -43,15 +66,6 @@ export class SelectAddComponent {
     if (event.key === 'Enter') {
       this.addNewOption();
     }
-  }
-
-  get backgroundHeight(): string {
-    if (this.isOpen && this.top && this.bottom) {
-      const topHeight = this.top.nativeElement.clientHeight;
-      const bottomHeight = this.bottom.nativeElement.clientHeight;
-      return `${topHeight + bottomHeight}px`;
-    }
-    return `100%`;
   }
 
   addNewOption() {
@@ -69,5 +83,20 @@ export class SelectAddComponent {
 
   toggle() {
     this.isOpen = !this.isOpen;
+    if (!this.isOpen) {
+      this.editMode = false;
+    }
+    this.backgroundHeight = this.getBackgroundHeight();
+    console.log('editable', this.editable);
+  }
+
+  private getBackgroundHeight(): string {
+    if (this.isOpen && this.top && this.bottom) {
+      const topHeight = this.top.nativeElement.clientHeight;
+      const bottomHeight = this.bottom.nativeElement.clientHeight;
+      console.log(topHeight, bottomHeight);
+      return `${topHeight + bottomHeight}px`;
+    }
+    return `100%`;
   }
 }

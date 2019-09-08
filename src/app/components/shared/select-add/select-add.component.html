@@ -1,12 +1,30 @@
-<div class="select-add {{ onlyShadowBorder ? 'shadow-border' : '' }}">
-  <div #top class="top" (click)="toggle()">
-    <p [innerHTML]="selected ? selected : placeholder"></p>
-    <img src="assets/arrow.svg" [className]="isOpen ? 'upside-down' : ''" alt="arrow" />
+<div class="select-add {{ onlyShadowBorder ? 'shadow-border' : '' }}" (click)="$event.stopPropagation()">
+  <div #top class="top" (click)="!editMode && toggle()">
+    <p [innerHTML]="selected ? selected : placeholder" *ngIf="!editMode || !selected; else editableSelected"></p>
+    <ng-template #editableSelected>
+      <input type="text" [value]="selected" (change)="changeOption(selected, $event)" />
+    </ng-template>
+    <img
+      src="assets/arrow.svg"
+      (click)="editMode && (toggle() || $event.stopPropagation())"
+      [className]="isOpen ? 'upside-down' : ''"
+      alt="arrow"
+    />
   </div>
 
   <div class="bottom-container">
     <div #bottom class="bottom {{ isOpen ? 'open' : '' }}">
-      <p *ngFor="let option of otherOptions" [innerHTML]="option" (click)="select(option)"></p>
+      <ng-container *ngIf="!editMode; else editableOthers">
+        <p *ngFor="let option of otherOptions" [innerHTML]="option" (click)="select(option)"></p>
+      </ng-container>
+      <ng-template #editableOthers>
+        <input
+          type="text"
+          *ngFor="let option of otherOptions"
+          [value]="option"
+          (change)="changeOption(option, $event)"
+        />
+      </ng-template>
 
       <input
         type="text"
@@ -16,7 +34,12 @@
         (keyup)="handleKeys($event)"
       />
 
-      <button *ngIf="options.length <= maxItemCount" (click)="addNewOption()" [disabled]="!newOption">Add</button>
+      <div class="buttons">
+        <button *ngIf="options.length <= maxItemCount" (click)="addNewOption()" [disabled]="!newOption">Add</button>
+        <div *ngIf="editable" class="edit {{ editMode ? 'active' : '' }}" (click)="editMode = !editMode">
+          <img src="assets/pen.svg" alt="edit" />
+        </div>
+      </div>
     </div>
   </div>
 

@@ -2,7 +2,6 @@
 
 :host {
   @include card();
-  box-shadow: $shadow;
 
   width: 66vw;
   max-width: 400px;
@@ -12,7 +11,9 @@
 
   box-sizing: border-box;
   padding: var(--large-padding);
+
   position: relative;
+  box-shadow: $shadow;
 
   @include inner-spacing(var(--large-padding));
 
