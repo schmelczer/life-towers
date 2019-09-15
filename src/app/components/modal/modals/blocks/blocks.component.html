@@ -1,50 +1,63 @@
 <section #container>
-  <div class="card transparent"></div>
+  <div class="card placeholder"></div>
   <div
-    *ngFor="let i of range({ min: 1, max: blocks.length + 1 })"
-    (click)="$event.stopPropagation(); scrollToChild(i)"
-    class="card {{ i === activeChild ? 'active' : '' }}"
+    *ngFor="let i of range({ max: blocks.length })"
+    (click)="$event.stopPropagation(); scrollToChild(i + 1)"
+    class="card {{ i + 1 === activeChild ? 'active' : '' }} {{
+      i + 2 === activeChild || i === activeChild ? 'near-active' : ''
+    }}"
   >
     <div class="mask"></div>
 
     <div class="header">
       <div class="exit" (click)="modalService.cancel()"></div>
+      <div class="block" [ngStyle]="{ 'background-color': tower.getColorOfBlock(editedValues[i]) | color }"></div>
       <h1>View item</h1>
     </div>
 
     <div class="select-add-container">
       <app-select-add
         class="select"
+        [disabled]="!editMode"
         [options]="tower.tags"
-        [default]="blocks[i - 1].tag"
+        [default]="editedValues[i].tag"
         [alwaysDropShadow]="true"
         [onlyShadowBorder]="true"
         [placeholder]="'Tag this item…'"
-        (value)="blocks[i - 1].changeKeys({ tag: $event })"
+        (value)="editedValues[i].tag = $event"
       ></app-select-add>
     </div>
 
     <textarea
+      [disabled]="!editMode"
       placeholder="Write a description here…"
-      [value]="blocks[i - 1].description"
-      (change)="blocks[i - 1].changeKeys({ description: $event.target.value })"
+      [(ngModel)]="editedValues[i].description"
     ></textarea>
 
     <div>
       <app-toggle
         [beforeText]="'This task hasn\'t been finished yet'"
         [afterText]="'Goal already accomplished'"
-        [default]="blocks[i - 1].isDone"
-        (value)="blocks[i - 1].changeKeys({ isDone: $event })"
+        [default]="blocks[i].isDone"
+        [disabled]="!editMode"
+        (value)="editedValues[i].isDone = $event"
       ></app-toggle>
     </div>
 
-    <div class="edit {{ editMode ? 'active' : '' }}" (click)="editMode = !editMode">
-      <img src="assets/pen.svg" alt="edit" />
+    <div class="bottom">
+      <button class="{{ editMode && i + 1 === activeChild ? '' : 'hidden' }}" (click)="submitChange()"></button>
+      <div class="edit {{ editMode && i + 1 === activeChild ? 'active' : '' }}" (click)="editMode = !editMode">
+        <img src="assets/pen.svg" alt="edit" />
+      </div>
     </div>
   </div>
 
-  <div (click)="$event.stopPropagation()" class="card {{ false ? 'active' : '' }}">
+  <div
+    (click)="$event.stopPropagation(); scrollToChild(blocks.length + 1)"
+    class="card {{ blocks.length + 1 === activeChild ? 'active' : '' }} {{
+      blocks.length === activeChild ? 'near-active' : ''
+    }} "
+  >
     <div class="mask"></div>
 
     <div class="header">
@@ -60,22 +73,24 @@
         [alwaysDropShadow]="true"
         [onlyShadowBorder]="true"
         [placeholder]="'Tag this item…'"
-        (value)="editedValues.tag = $event"
+        (value)="top(editedValues).tag = $event"
       ></app-select-add>
     </div>
 
-    <textarea placeholder="Write a description here…" [(ngModel)]="editedValues.description"></textarea>
+    <textarea placeholder="Write a description here…" [(ngModel)]="top(editedValues).description"></textarea>
 
     <div>
       <app-toggle
         [beforeText]="'This task hasn\'t been finished yet'"
         [afterText]="'Goal already accomplished'"
         [default]="onlyDone"
-        (value)="editedValues.isDone = $event"
+        (value)="top(editedValues).isDone = $event"
       ></app-toggle>
     </div>
 
-    <button (click)="submitAdd()" [disabled]="!editedValues.tag">Create</button>
+    <div class="bottom">
+      <button (click)="submitAdd()" [disabled]="!top(editedValues).tag">Create and exit</button>
+    </div>
   </div>
-  <div class="card transparent"></div>
+  <div class="card placeholder"></div>
 </section>

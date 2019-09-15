@@ -1,5 +1,7 @@
 <span [className]="!on ? 'active' : ''" (click)="on = false" [innerText]="beforeText"></span>
 
-<input type="checkbox" [(ngModel)]="on" [className]="on ? 'on' : ''" />
+<label class="{{ disabled ? 'disabled' : '' }}">
+  <input type="checkbox" [disabled]="disabled" [(ngModel)]="on" [className]="on ? 'on' : ''" />
+</label>
 
 <span [className]="on ? 'active' : ''" (click)="on = true" [innerText]="afterText"></span>

@@ -37,6 +37,7 @@
   max-width: 400px;
   @media (max-width: $mobile-width) {
     width: 300px;
+    opacity: 1 !important;
   }
 
   box-sizing: border-box;
@@ -44,13 +45,17 @@
   margin: calc(var(--large-padding) / 2);
   position: relative;
 
+  &.near-active {
+    cursor: pointer;
+  }
+
   .mask {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    z-index: 100;
+    z-index: 10000;
 
     @include card();
   }
@@ -59,67 +64,99 @@
     margin-left: var(--large-padding);
   }
 
-  &.transparent {
+  &.placeholder {
     opacity: 0;
+    width: 1000px;
+    max-width: 1000px;
   }
 
   @include inner-spacing(var(--large-padding));
 
   .header {
     @include center-child();
+    position: relative;
 
     .exit {
       position: absolute;
-      left: var(--large-padding);
+      left: 0;
 
       @include exit();
     }
+
+    .block {
+      @include square(12px);
+      margin-right: 10px;
+    }
   }
 
-  .edit {
+  .bottom {
+    height: 32px;
+    @media (max-width: $mobile-width) {
+      height: 24px;
+    }
+
     position: relative;
-    display: inline-block;
-    float: right;
-    opacity: 0.25;
-    cursor: pointer;
 
-    img {
-      @include square(16px);
-    }
-
-    transition: opacity $short-animation-time;
-
-    &:before {
-      content: '';
-      display: block;
+    button {
+      margin: 0;
       position: absolute;
-      bottom: calc(-1 * #{$line-height});
-      left: 0;
-      height: $line-height;
-      background-color: $text-color;
-      width: 0;
-      transition: width $long-animation-time;
+      left: 50%;
+      top: 50%;
+      transform: translateY(-50%) translateX(-50%);
+
+      transition: opacity $short-animation-time;
+
+      &.hidden {
+        opacity: 0;
+      }
     }
 
-    @media (min-width: $mobile-width) {
-      &:hover {
-        opacity: 0.5;
+    .edit {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.25;
+      cursor: pointer;
+
+      img {
+        @include square(16px);
       }
-      &:hover {
+
+      transition: opacity $short-animation-time;
+
+      &:before {
+        content: '';
+        display: block;
+        position: absolute;
+        bottom: calc(-1 * #{$line-height});
+        left: 0;
+        height: $line-height;
+        background-color: $text-color;
+        width: 0;
+        transition: width $long-animation-time;
+      }
+
+      @media (min-width: $mobile-width) {
+        &:hover {
+          opacity: 0.5;
+        }
+        &:hover {
+          &:before {
+            width: 100% !important;
+          }
+        }
+      }
+
+      &.active {
         &:before {
           width: 100% !important;
         }
       }
-    }
 
-    &.active {
-      &:before {
-        width: 100% !important;
+      &.active {
+        opacity: 1;
       }
-    }
-
-    &.active {
-      opacity: 1;
     }
   }
 }

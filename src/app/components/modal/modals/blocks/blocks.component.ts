@@ -6,9 +6,7 @@ import { Block } from '../../../../model/block';
 import { IBlock } from '../../../../interfaces/persistance/block';
 import { CancelService } from '../../../../services/cancel.service';
 import { range } from 'src/app/utils/range';
-import { el } from '@angular/platform-browser/testing/src/browser_util';
-
-const SWIPE_LIMIT = 0.35;
+import { top } from 'src/app/utils/top';
 
 @Component({
   selector: 'app-blocks',
@@ -17,10 +15,11 @@ const SWIPE_LIMIT = 0.35;
 })
 export class BlocksComponent implements OnInit, OnDestroy {
   readonly range = range;
+  readonly top = top;
 
   tower: Tower;
 
-  editedValues: Partial<IBlock>;
+  editedValues: Array<Partial<IBlock>>;
 
   endOfScrollToken = 0;
   editMode = false;
@@ -76,13 +75,16 @@ export class BlocksComponent implements OnInit, OnDestroy {
     this.onlyDone = onlyDone;
     this.subscription = tower$.subscribe(value => {
       this.tower = value;
-      setTimeout(() => this.scrollToChild(this.blocks.indexOf(startBlock) + 1, true));
-    });
+      this.editedValues = this.blocks.map(({ isDone, description, tag }) => ({ isDone, description, tag }));
+      this.editedValues.push({
+        isDone: this.onlyDone,
+        description: ''
+      });
 
-    this.editedValues = {
-      isDone: onlyDone,
-      description: ''
-    };
+      setTimeout(() =>
+        this.scrollToChild(startBlock ? this.blocks.indexOf(startBlock) + 1 : this.blocks.length + 1, true)
+      );
+    });
   }
 
   animateScroll() {
@@ -106,8 +108,9 @@ export class BlocksComponent implements OnInit, OnDestroy {
 
   animate(cardStyle, maskStyle, t: number) {
     t = Math.min(1, Math.max(0, t));
+    cardStyle.opacity = (1 - t / 1.5).toString();
     maskStyle.opacity = Math.pow(t, 0.5).toString();
-    maskStyle.display = t === 0 ? 'none' : 'block';
+    maskStyle.display = t <= 0.1 ? 'none' : 'block';
   }
 
   adjustPosition() {
@@ -141,8 +144,13 @@ export class BlocksComponent implements OnInit, OnDestroy {
   }
 
   submitAdd() {
-    this.editedValues.created = new Date();
-    this.tower.addBlock(this.editedValues as IBlock);
+    top(this.editedValues).created = new Date();
+    this.tower.addBlock(top(this.editedValues) as IBlock);
+    this.modalService.submit();
+  }
+
+  submitChange() {
+    this.blocks[this.activeChild - 1].changeKeys(this.editedValues[this.activeChild - 1]);
     this.modalService.submit();
   }
 

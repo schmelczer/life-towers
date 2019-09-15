@@ -9,6 +9,8 @@ export class ToggleComponent {
   @Input() beforeText: string;
   @Input() afterText: string;
 
+  @Input() disabled = false;
+
   @Output() value: EventEmitter<boolean> = new EventEmitter();
 
   @Input() set default(value: boolean) {

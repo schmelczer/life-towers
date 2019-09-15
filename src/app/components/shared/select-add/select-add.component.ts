@@ -13,6 +13,7 @@ export class SelectAddComponent {
   @Input() alwaysDropShadow = false;
   @Input() onlyShadowBorder = false;
   @Input() editable = false;
+  @Input() disabled = false;
 
   @Input() set default(value: string) {
     this.selected = value;
