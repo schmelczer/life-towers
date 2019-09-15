@@ -7,12 +7,7 @@
     <ng-template #editableSelected>
       <input type="text" [value]="selected" (change)="changeOption(selected, $event)" />
     </ng-template>
-    <img
-      src="assets/arrow.svg"
-      (click)="editMode && (toggle() || $event.stopPropagation())"
-      [className]="isOpen ? 'upside-down' : ''"
-      alt="arrow"
-    />
+    <img src="assets/arrow.svg" (click)="onArrowClick($event)" [className]="isOpen ? 'upside-down' : ''" alt="arrow" />
   </div>
 
   <div class="bottom-container">

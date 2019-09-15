@@ -26,10 +26,10 @@ export class BlocksComponent implements OnInit, OnDestroy {
   activeChild: number;
   scrollMayEnd = true;
 
-  @ViewChild('container') container: ElementRef;
+  onlyDone: boolean;
 
+  @ViewChild('container') container: ElementRef;
   private subscription;
-  private onlyDone: boolean;
 
   @HostListener('click') cancel() {
     this.cancelService.cancelAll();
@@ -55,7 +55,7 @@ export class BlocksComponent implements OnInit, OnDestroy {
   }
 
   constructor(
-    private modalService: ModalService,
+    public modalService: ModalService,
     private cancelService: CancelService,
     private changeDetector: ChangeDetectorRef,
     private component: ElementRef

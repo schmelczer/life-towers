@@ -89,7 +89,13 @@ export class SelectAddComponent {
       this.editMode = false;
     }
     this.backgroundHeight = this.getBackgroundHeight();
-    console.log('editable', this.editable);
+  }
+
+  onArrowClick(event) {
+    if (this.editMode) {
+      this.toggle();
+      event.stopPropagation();
+    }
   }
 
   private getBackgroundHeight(): string {
