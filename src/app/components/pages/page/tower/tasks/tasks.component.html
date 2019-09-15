@@ -1,8 +1,9 @@
-<div *ngIf="tasks" class="container {{ tasks.length > 0 ? 'show-hover' : '' }}">
+<div *ngIf="tasks" class="container {{ tasks.length > 0 ? 'show-hover' : '' }}" (click)="$event.stopPropagation()">
   <p class="header" (click)="isOpen = !isOpen">
     <strong>
       {{ tasks.length == 0 ? '' : tasks.length }}
     </strong>
+    <!-- &#8203; is the zero width space -->
     {{ tasks.length == 0 ? '&#8203;' : tasks.length == 1 ? 'task' : 'tasks' }}
   </p>
   <div class="all-task" #allTask [ngStyle]="{ height: (isOpen ? allTask?.scrollHeight : 0) + 'px' }">

@@ -1,0 +1,81 @@
+<section #container>
+  <div class="card transparent"></div>
+  <div
+    *ngFor="let i of range({ min: 1, max: blocks.length + 1 })"
+    (click)="$event.stopPropagation(); scrollToChild(i)"
+    class="card {{ i === activeChild ? 'active' : '' }}"
+  >
+    <div class="mask"></div>
+
+    <div class="header">
+      <div class="exit" (click)="modalService.cancel()"></div>
+      <h1>View item</h1>
+    </div>
+
+    <div class="select-add-container">
+      <app-select-add
+        class="select"
+        [options]="tower.tags"
+        [default]="blocks[i - 1].tag"
+        [alwaysDropShadow]="true"
+        [onlyShadowBorder]="true"
+        [placeholder]="'Tag this item…'"
+        (value)="blocks[i - 1].changeKeys({ tag: $event })"
+      ></app-select-add>
+    </div>
+
+    <textarea
+      placeholder="Write a description here…"
+      [value]="blocks[i - 1].description"
+      (change)="blocks[i - 1].changeKeys({ description: $event.target.value })"
+    ></textarea>
+
+    <div>
+      <app-toggle
+        [beforeText]="'This task hasn\'t been finished yet'"
+        [afterText]="'Goal already accomplished'"
+        [default]="blocks[i - 1].isDone"
+        (value)="blocks[i - 1].changeKeys({ isDone: $event })"
+      ></app-toggle>
+    </div>
+
+    <div class="edit {{ editMode ? 'active' : '' }}" (click)="editMode = !editMode">
+      <img src="assets/pen.svg" alt="edit" />
+    </div>
+  </div>
+
+  <div (click)="$event.stopPropagation()" class="card {{ false ? 'active' : '' }}">
+    <div class="mask"></div>
+
+    <div class="header">
+      <div class="exit" (click)="modalService.cancel()"></div>
+      <h1>Create an item</h1>
+    </div>
+
+    <div class="select-add-container">
+      <app-select-add
+        class="select"
+        [options]="tower.tags"
+        [default]="tower.tags.length ? tower.tags[0] : null"
+        [alwaysDropShadow]="true"
+        [onlyShadowBorder]="true"
+        [placeholder]="'Tag this item…'"
+        (value)="editedValues.tag = $event"
+      ></app-select-add>
+    </div>
+
+    <textarea placeholder="Write a description here…" [(ngModel)]="editedValues.description"></textarea>
+
+    <div>
+      <app-toggle
+        [beforeText]="'This task hasn\'t been finished yet'"
+        [afterText]="'Goal already accomplished'"
+        [default]="onlyDone"
+        (value)="editedValues.isDone = $event"
+      ></app-toggle>
+    </div>
+
+    <button (click)="submitAdd()" [disabled]="!editedValues.tag">Create</button>
+  </div>
+  <div class="card transparent"></div>
+</section>

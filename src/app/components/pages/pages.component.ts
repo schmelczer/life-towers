@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Page } from '../../model/page';
 import { DataService } from '../../services/data.service';
 import { ModalService } from '../../services/modal.service';
@@ -32,7 +32,11 @@ export class PagesComponent implements OnInit {
   private readonly _selectedPage: BehaviorSubject<Page> = new BehaviorSubject(null);
   readonly selectedPage$: Observable<Page> = this._selectedPage.asObservable();
 
-  constructor(public dataService: DataService, private modalService: ModalService) {
+  constructor(
+    public dataService: DataService,
+    private modalService: ModalService,
+    private changeDetection: ChangeDetectorRef
+  ) {
     const userData = JSON.parse(window.localStorage.getItem(USER_DATA_KEY));
     if (userData !== null) {
       this.selectedPageName = userData.selectedPage;
@@ -42,7 +46,7 @@ export class PagesComponent implements OnInit {
   ngOnInit() {
     this.dataService.children$.subscribe(pages => {
       if (pages) {
-        if (this.pages && this.pages.length - 1 === pages.length) {
+        if (this.pages && !pages.includes(this._selectedPage.getValue().latestVersion)) {
           this.selectedPageName = null;
         }
         this.pages = pages;
@@ -54,10 +58,10 @@ export class PagesComponent implements OnInit {
   changeName({ from, to }: { from: string; to: string }) {
     const page = this.pages.find(p => p.name === from);
     if (page) {
-      page.changeName(to);
       if (from === this.selectedPageName) {
-        this.selectPage(to);
+        this.selectedPageName = to;
       }
+      page.changeName(to);
     }
   }
 
@@ -94,6 +98,8 @@ export class PagesComponent implements OnInit {
       await this.modalService.showSettings(this.selectedPage$);
     } catch {
       // pass
+    } finally {
+      this.changeDetection.markForCheck();
     }
   }
 }

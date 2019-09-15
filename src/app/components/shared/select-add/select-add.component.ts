@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CancelService } from '../../../services/cancel.service';
 
 @Component({
@@ -43,10 +43,11 @@ export class SelectAddComponent {
   newOption: string;
   isOpen = false;
 
-  constructor(private cancelService: CancelService) {
+  constructor(private cancelService: CancelService, private changeDetection: ChangeDetectorRef) {
     this.cancelService.subscribe(this, () => {
       this.isOpen = false;
       this.editMode = false;
+      this.changeDetection.markForCheck();
     });
   }
 

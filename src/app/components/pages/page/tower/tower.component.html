@@ -1,19 +1,19 @@
 <div class="tower" *ngIf="tower$ | async">
   <div class="container">
     <div class="tasks-container">
-      <app-tasks [tasks]="tasks" [tower]="tower$ | async"></app-tasks>
+      <app-tasks [tasks]="tasks" [tower$]="tower$"></app-tasks>
     </div>
 
-    <img src="assets/plus-sign.svg" alt="add item" (click)="addBlock()" />
+    <img src="assets/plus-sign.svg" alt="add item" (click)="$event.stopPropagation() || addBlock()" />
 
     <div class="block-container-container">
-      <div class="block-container" *ngIf="blocks.length > 0">
+      <div class="block-container" *ngIf="styledBlocks.length > 0">
         <app-block
+          *ngFor="let block of drawableBlocks"
           [ngClass]="block.cssClass"
           [ngStyle]="block.style"
-          *ngFor="let block of drawableBlocks"
           [block]="block"
-          [tower]="tower$ | async"
+          [tower$]="tower$"
         ></app-block>
       </div>
     </div>

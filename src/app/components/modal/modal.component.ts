@@ -1,5 +1,6 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { Component } from '@angular/core';
 import { ModalService, ModalType } from '../../services/modal.service';
+import { CancelService } from '../../services/cancel.service';
 
 @Component({
   selector: 'app-modal',
@@ -9,16 +10,7 @@ import { ModalService, ModalType } from '../../services/modal.service';
 export class ModalComponent {
   ModalType = ModalType;
 
-  constructor(public modalService: ModalService, private changeDetectionRef: ChangeDetectorRef) {
-    window.addEventListener('keydown', (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        this.modalService.cancel();
-      }
-    });
-
-    /*window.addEventListener('resize', (_: UIEvent) => {
-      console.log('resize');
-      this.changeDetectionRef.markForCheck();
-    });*/
+  constructor(public modalService: ModalService, private cancelService: CancelService) {
+    this.cancelService.subscribe(this, () => this.modalService.cancel());
   }
 }

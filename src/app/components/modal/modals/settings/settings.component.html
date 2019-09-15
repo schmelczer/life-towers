@@ -4,7 +4,6 @@
 </div>
 
 <div>
-  <!-- wrapper for easier styling -->
   <app-toggle
     [beforeText]="'Hide create tower button'"
     [afterText]="'Show create tower button'"
@@ -12,8 +11,7 @@
     (value)="page.setHideCreateTowerButton(!$event)"
   ></app-toggle>
 </div>
-<!-- wrapper for easier styling -->
 
 <p *ngIf="page.towers.length == 5">There can be a maximum of <strong>5</strong> towers on each page.</p>
 
-<button (click)="deletePage()">Delete current page</button>
+<button (click)="$event.stopPropagation() || deletePage()">Delete current page</button>

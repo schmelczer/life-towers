@@ -17,4 +17,6 @@
 </div>
 <!-- wrapper for easier styling -->
 
-<button [ngClass]="isDragHappening ? 'transparent' : ''" (click)="openSettings()">Settings</button>
+<button [ngClass]="isDragHappening ? 'transparent' : ''" (click)="$event.stopPropagation(); openSettings()">
+  Settings
+</button>

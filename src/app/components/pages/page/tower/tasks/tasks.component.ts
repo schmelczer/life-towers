@@ -1,19 +1,19 @@
-import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
-import { Block, BlockState } from '../../../../../model/block';
+import { ChangeDetectorRef, Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { Block } from '../../../../../model/block';
 import { Tower } from '../../../../../model/tower';
 import { ModalService } from '../../../../../services/modal.service';
 import { CancelService } from '../../../../../services/cancel.service';
 import { IColor } from '../../../../../interfaces/color';
-import { IBlock } from '../../../../../interfaces/persistance/block';
+import { Observable } from 'rxjs/internal/Observable';
 
 @Component({
   selector: 'app-tasks',
   templateUrl: './tasks.component.html',
   styleUrls: ['./tasks.component.scss']
 })
-export class TasksComponent implements OnInit {
+export class TasksComponent {
   @Input() tasks: Array<Block & { color: IColor }>;
-  @Input() tower: Tower;
+  @Input() tower$: Observable<Tower>;
 
   private _isOpen = false;
   @Input() set isOpen(value: boolean) {
@@ -29,47 +29,27 @@ export class TasksComponent implements OnInit {
 
   @ViewChild('allTask') allTask: ElementRef;
 
-  constructor(private modalService: ModalService, private cancelService: CancelService) {
+  constructor(
+    private modalService: ModalService,
+    private cancelService: CancelService,
+    private changeDetection: ChangeDetectorRef
+  ) {
     this.cancelService.subscribe(this, () => {
       this.isOpen = false;
     });
   }
 
-  ngOnInit() {}
-
   async handleClick(block: Block) {
     try {
-      const { selected, description, isDone } = await this.modalService.showEditBlock({
-        options: this.tower.tags,
-        default: block.tag,
-        description: block.description,
-        isDone: block.isDone
+      await this.modalService.showBlocks({
+        tower$: this.tower$,
+        startBlock: block,
+        onlyDone: false
       });
-
-      const change: Partial<IBlock> = {
-        tag: selected,
-        description,
-        isDone
-      };
-      if (!block.isDone && isDone) {
-        change.created = new Date();
-      }
-
-      block.changeKeys(change);
     } catch {
       // pass
-    }
-  }
-
-  public async addTask() {
-    try {
-      const { selected: tag, description, isDone } = await this.modalService.showCreateBlock({
-        options: this.tower.tags,
-        isTask: true
-      });
-      this.tower.addBlock({ tag, description, isDone });
-    } catch (e) {
-      // pass
+    } finally {
+      this.changeDetection.markForCheck();
     }
   }
 }

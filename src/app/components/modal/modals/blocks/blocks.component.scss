@@ -1,0 +1,134 @@
+@import '../../../../../styles';
+
+:host {
+  @include center-child();
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  overflow-x: auto;
+
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  section {
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+    align-items: center;
+
+    box-sizing: border-box;
+  }
+}
+
+.card {
+  @include card();
+  box-shadow: $shadow;
+  display: block;
+
+  transform-origin: center center;
+
+  flex: 0 0 auto;
+  width: 66vw;
+  max-width: 400px;
+  @media (max-width: $mobile-width) {
+    width: 300px;
+  }
+
+  box-sizing: border-box;
+  padding: var(--large-padding);
+  margin: calc(var(--large-padding) / 2);
+  position: relative;
+
+  .mask {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+
+    @include card();
+  }
+
+  &:first-child {
+    margin-left: var(--large-padding);
+  }
+
+  &.transparent {
+    opacity: 0;
+  }
+
+  @include inner-spacing(var(--large-padding));
+
+  .header {
+    @include center-child();
+
+    .exit {
+      position: absolute;
+      left: var(--large-padding);
+
+      @include exit();
+    }
+  }
+
+  .edit {
+    position: relative;
+    display: inline-block;
+    float: right;
+    opacity: 0.25;
+    cursor: pointer;
+
+    img {
+      @include square(16px);
+    }
+
+    transition: opacity $short-animation-time;
+
+    &:before {
+      content: '';
+      display: block;
+      position: absolute;
+      bottom: calc(-1 * #{$line-height});
+      left: 0;
+      height: $line-height;
+      background-color: $text-color;
+      width: 0;
+      transition: width $long-animation-time;
+    }
+
+    @media (min-width: $mobile-width) {
+      &:hover {
+        opacity: 0.5;
+      }
+      &:hover {
+        &:before {
+          width: 100% !important;
+        }
+      }
+    }
+
+    &.active {
+      &:before {
+        width: 100% !important;
+      }
+    }
+
+    &.active {
+      opacity: 1;
+    }
+  }
+}
+
+.card:last-child:after {
+  content: '';
+  height: 1px;
+  width: var(--large-padding);
+  right: calc(-1 * var(--large-padding));
+  display: block;
+  position: absolute;
+}

@@ -4,11 +4,10 @@ import { top } from '../utils/top';
 import { CancelService } from './cancel.service';
 import { Page } from '../model/page';
 import { Observable } from 'rxjs/internal/Observable';
+import { Block } from '../model/block';
 
 export enum ModalType {
-  createBlock,
-  editBlock,
-  removeBlock,
+  blocks,
   settings,
   removeTower,
   removePage,
@@ -30,20 +29,8 @@ export class ModalService {
 
   constructor(private cancelService: CancelService) {}
 
-  showCreateBlock(input: {
-    options: string[];
-    isTask: boolean;
-  }): Promise<{ selected: string; description: string; isDone: boolean }> {
-    return this.createPromiseAndPushToStack(input, ModalType.createBlock);
-  }
-
-  showEditBlock(data: {
-    default: string;
-    options: string[];
-    description: string;
-    isDone: boolean;
-  }): Promise<{ selected: string; description: string; isDone: boolean }> {
-    return this.createPromiseAndPushToStack(data, ModalType.editBlock);
+  showBlocks(input: { tower$: Observable<Tower>; onlyDone: boolean; startBlock?: Block }): Promise<void> {
+    return this.createPromiseAndPushToStack(input, ModalType.blocks);
   }
 
   showSettings(selectedPage: Observable<Page>): Promise<void> {
@@ -63,13 +50,17 @@ export class ModalService {
   }
 
   submit(output?: any) {
-    const { resolve } = this.modalStack.pop();
-    resolve(output);
+    const modal = this.modalStack.pop();
+    if (modal) {
+      modal.resolve(output);
+    }
   }
 
   cancel() {
-    const { reject } = this.modalStack.pop();
-    reject();
+    const modal = this.modalStack.pop();
+    if (modal) {
+      modal.reject();
+    }
   }
 
   private createPromiseAndPushToStack(input: any, type: ModalType): Promise<any> {

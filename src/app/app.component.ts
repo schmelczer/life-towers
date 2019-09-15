@@ -10,9 +10,15 @@ import { CancelService } from './services/cancel.service';
 export class AppComponent implements DoCheck {
   title = 'life';
 
-  constructor(public cancelService: CancelService) {}
+  constructor(public cancelService: CancelService) {
+    window.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        this.cancelService.cancelAll();
+      }
+    });
+  }
 
   ngDoCheck() {
-    console.log('app change detection');
+    // console.log('app change detection');
   }
 }

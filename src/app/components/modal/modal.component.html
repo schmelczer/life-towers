@@ -1,7 +1,9 @@
-<section class="{{ modalService.active ? 'active' : '' }}" [ngSwitch]="modalService.active?.type">
-  <app-create-block (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.createBlock"></app-create-block>
-  <app-edit-block (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.editBlock"></app-edit-block>
-  <app-remove-block (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.removeBlock"></app-remove-block>
+<section
+  (click)="modalService.cancel()"
+  class="{{ modalService.active ? 'active' : '' }}"
+  [ngSwitch]="modalService.active?.type"
+>
+  <app-blocks (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.blocks"></app-blocks>
   <app-remove-tower (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.removeTower"></app-remove-tower>
   <app-settings (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.settings"></app-settings>
   <app-get-started (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.getStarted"></app-get-started>
