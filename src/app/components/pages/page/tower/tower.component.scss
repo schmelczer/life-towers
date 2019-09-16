@@ -13,18 +13,25 @@
 
   &:hover {
     @media (min-width: $mobile-width) {
-      div {
-        .container {
-          box-shadow: $shadow;
-        }
+      div.container {
+        box-shadow: $shadow;
       }
     }
   }
 
   &.cdk-drag-preview {
-    div {
-      .container {
-        box-shadow: $shadow;
+    div.container {
+      @media (max-width: $mobile-width) {
+        @keyframes shadow {
+          from {
+            box-shadow: none;
+          }
+          to {
+            box-shadow: $shadow;
+          }
+        }
+
+        animation: shadow $long-animation-time forwards;
       }
     }
   }
@@ -85,9 +92,6 @@
         opacity: 0;
         border-radius: var(--border-radius);
         transition: opacity $short-animation-time;
-      }
-
-      .tasks-container {
       }
 
       img {

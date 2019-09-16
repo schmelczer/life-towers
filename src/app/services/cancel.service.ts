@@ -19,12 +19,10 @@ export class CancelService {
   }
 
   cancelAllExcept(except: object) {
-    console.log('cancel all except', except);
     this.subscribers.filter(s => s.object !== except).map(s => s.callback());
   }
 
   cancelAll() {
-    console.log('cancel all');
     this.subscribers.map(s => s.callback());
   }
 }

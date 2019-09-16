@@ -11,7 +11,7 @@
 
     <div class="header">
       <div class="exit" (click)="modalService.cancel()"></div>
-      <div class="block" [ngStyle]="{ 'background-color': tower.getColorOfBlock(editedValues[i]) | color }"></div>
+      <div class="block" [ngStyle]="{ 'background-color': tower.getColorOfTag(editedValues[i].tag) | color }"></div>
       <h1>View item</h1>
     </div>
 
@@ -30,7 +30,7 @@
 
     <textarea
       [disabled]="!editMode"
-      placeholder="Write a description here…"
+      placeholder="{{ editMode ? 'Write a description here…' : '' }}"
       [(ngModel)]="editedValues[i].description"
     ></textarea>
 
@@ -45,7 +45,9 @@
     </div>
 
     <div class="bottom">
-      <button class="{{ editMode && i + 1 === activeChild ? '' : 'hidden' }}" (click)="submitChange()"></button>
+      <button class="{{ editMode && i + 1 === activeChild ? '' : 'hidden' }}" (click)="submitChange()">
+        Save and exit
+      </button>
       <div class="edit {{ editMode && i + 1 === activeChild ? 'active' : '' }}" (click)="editMode = !editMode">
         <img src="assets/pen.svg" alt="edit" />
       </div>
@@ -62,6 +64,7 @@
 
     <div class="header">
       <div class="exit" (click)="modalService.cancel()"></div>
+      <div class="block" [ngStyle]="{ 'background-color': tower.getColorOfTag(top(editedValues).tag) | color }"></div>
       <h1>Create an item</h1>
     </div>
 

@@ -48,8 +48,8 @@ export class Tower extends Serializable implements ITower, TowerState {
     this.changeKeys({ name });
   }
 
-  getColorOfBlock(block: Block): IColor {
-    return lighten((hash(block.tag) - 0.5) * 50, this.baseColor);
+  getColorOfTag(tag: string): IColor {
+    return lighten((hash(tag) - 0.5) * 50, this.baseColor);
   }
 
   protected onAfterClone() {
@@ -59,7 +59,7 @@ export class Tower extends Serializable implements ITower, TowerState {
 
     this.coloredBlocks = this.blocks.map(b => {
       const coloredBlock = b as ColoredBlock;
-      coloredBlock.color = this.getColorOfBlock(b);
+      coloredBlock.color = this.getColorOfTag(b.tag);
       return coloredBlock;
     });
 

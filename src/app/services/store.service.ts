@@ -1,6 +1,4 @@
 import { Injectable } from '@angular/core';
-import { Page } from '../model/page';
-import { IPage } from '../interfaces/persistance/page';
 
 const LOCAL_STORAGE_KEY = 'life-towers.data.v.2';
 

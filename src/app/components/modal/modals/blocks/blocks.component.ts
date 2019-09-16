@@ -45,6 +45,8 @@ export class BlocksComponent implements OnInit, OnDestroy {
   }
 
   @HostListener('scroll') onScroll() {
+    console.log('scrolling');
+
     this.animateScroll();
     const newToken = ++this.endOfScrollToken;
     setTimeout(() => {
@@ -59,7 +61,9 @@ export class BlocksComponent implements OnInit, OnDestroy {
     private cancelService: CancelService,
     private changeDetector: ChangeDetectorRef,
     private component: ElementRef
-  ) {}
+  ) {
+    window.addEventListener('resize', this.onScroll.bind(this));
+  }
 
   get blocks(): Array<Block> {
     return this.tower.blocks.filter(b => b.isDone === this.onlyDone);
@@ -107,10 +111,12 @@ export class BlocksComponent implements OnInit, OnDestroy {
   }
 
   animate(cardStyle, maskStyle, t: number) {
+    t = Math.min(2, Math.max(0, t));
+    cardStyle.opacity = (1.33 * (1 - t / 2)).toString();
+    console.log(1 - t / 2);
     t = Math.min(1, Math.max(0, t));
-    cardStyle.opacity = (1 - t / 1.5).toString();
     maskStyle.opacity = Math.pow(t, 0.5).toString();
-    maskStyle.display = t <= 0.1 ? 'none' : 'block';
+    maskStyle.display = t <= 0.05 ? 'none' : 'block';
   }
 
   adjustPosition() {
@@ -118,13 +124,17 @@ export class BlocksComponent implements OnInit, OnDestroy {
       return;
     }
 
+    console.log('adjusting position');
+
     const c = this.component.nativeElement;
 
     const middle =
       [...this.container.nativeElement.children]
         .slice(1, -1)
         .map(element => Math.abs(element.offsetLeft - c.scrollLeft + element.clientWidth / 2 - window.innerWidth / 2))
-        .map((value, index) => (Math.abs(index + 1 - this.activeChild) === 1 ? value / 1.5 : value))
+        .map((value, index) =>
+          Math.abs(index + 1 - this.activeChild) === 1 ? Math.abs(value - window.innerWidth / 4) : value
+        )
         .reduce(
           (middleIndex, current, currentIndex, list) => (list[middleIndex] < current ? middleIndex : currentIndex),
           0
@@ -136,6 +146,7 @@ export class BlocksComponent implements OnInit, OnDestroy {
 
   scrollToChild(index: number, instantly?: boolean) {
     this.activeChild = index;
+    console.log('scrolling to', index);
     const element = this.container.nativeElement.children[index];
     this.component.nativeElement.scrollTo({
       left: element.offsetLeft - (window.innerWidth / 2 - element.clientWidth / 2),

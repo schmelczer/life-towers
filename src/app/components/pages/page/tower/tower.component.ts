@@ -56,7 +56,9 @@ export class TowerComponent implements OnInit {
           });
 
           if (
-            (difference.every(i => i) && this.tower.blocks.length + 1 === value.blocks.length) ||
+            (difference.every(i => i) &&
+              this.tower.blocks.length + 1 === value.blocks.length &&
+              top(value.blocks).isDone) ||
             (this.tower.blocks.length === value.blocks.length &&
               this.tower.blocks.filter(b => b.isDone).length + 1 === value.blocks.filter(b => b.isDone).length)
           ) {
