@@ -1,4 +1,4 @@
-<section #container>
+<section #container *ngIf="tower">
   <div class="card placeholder"></div>
   <div
     *ngFor="let i of range({ max: blocks.length })"
@@ -12,13 +12,12 @@
     <div class="header">
       <div class="exit" (click)="modalService.cancel()"></div>
       <div class="block" [ngStyle]="{ 'background-color': tower.getColorOfTag(editedValues[i].tag) | color }"></div>
-      <h1>View item</h1>
+      <h1 [innerText]="editedValues[i]?.created | formatDate"></h1>
     </div>
 
     <div class="select-add-container">
       <app-select-add
         class="select"
-        [disabled]="!editMode"
         [options]="tower.tags"
         [default]="editedValues[i].tag"
         [alwaysDropShadow]="true"
@@ -28,29 +27,15 @@
       ></app-select-add>
     </div>
 
-    <textarea
-      [disabled]="!editMode"
-      placeholder="{{ editMode ? 'Write a description here…' : '' }}"
-      [(ngModel)]="editedValues[i].description"
-    ></textarea>
+    <textarea placeholder="Write a description here…" [(ngModel)]="editedValues[i].description"></textarea>
 
     <div>
       <app-toggle
         [beforeText]="'This task hasn\'t been finished yet'"
         [afterText]="'Goal already accomplished'"
         [default]="blocks[i].isDone"
-        [disabled]="!editMode"
         (value)="editedValues[i].isDone = $event"
       ></app-toggle>
-    </div>
-
-    <div class="bottom">
-      <button class="{{ editMode && i + 1 === activeChild ? '' : 'hidden' }}" (click)="submitChange()">
-        Save and exit
-      </button>
-      <div class="edit {{ editMode && i + 1 === activeChild ? 'active' : '' }}" (click)="editMode = !editMode">
-        <img src="assets/pen.svg" alt="edit" />
-      </div>
     </div>
   </div>
 
@@ -65,7 +50,7 @@
     <div class="header">
       <div class="exit" (click)="modalService.cancel()"></div>
       <div class="block" [ngStyle]="{ 'background-color': tower.getColorOfTag(top(editedValues).tag) | color }"></div>
-      <h1>Create an item</h1>
+      <h1>Create now</h1>
     </div>
 
     <div class="select-add-container">
@@ -75,7 +60,8 @@
         [default]="tower.tags.length ? tower.tags[0] : null"
         [alwaysDropShadow]="true"
         [onlyShadowBorder]="true"
-        [placeholder]="'Tag this item…'"
+        [placeholder]="'Set a category…'"
+        [newValuePlaceholder]="'Add a category…'"
         (value)="top(editedValues).tag = $event"
       ></app-select-add>
     </div>

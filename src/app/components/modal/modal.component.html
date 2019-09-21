@@ -3,7 +3,7 @@
   class="{{ modalService.active ? 'active' : '' }}"
   [ngSwitch]="modalService.active?.type"
 >
-  <app-blocks (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.blocks"></app-blocks>
+  <app-blocks (save)="save = $event" (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.blocks"></app-blocks>
   <app-remove-tower (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.removeTower"></app-remove-tower>
   <app-settings (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.settings"></app-settings>
   <app-get-started (click)="$event.stopPropagation()" *ngSwitchCase="ModalType.getStarted"></app-get-started>

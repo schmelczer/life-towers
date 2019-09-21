@@ -70,8 +70,8 @@
 
   &.placeholder {
     opacity: 0 !important;
-    width: 1000px;
-    max-width: 1000px;
+    width: 60vw;
+    max-width: 60vw;
   }
 
   @include inner-spacing(var(--large-padding));

@@ -10,7 +10,16 @@ import { CancelService } from '../../services/cancel.service';
 export class ModalComponent {
   ModalType = ModalType;
 
+  save: () => void = null;
+
   constructor(public modalService: ModalService, private cancelService: CancelService) {
-    this.cancelService.subscribe(this, () => this.modalService.cancel());
+    this.cancelService.subscribe(this, () => {
+      if (this.save) {
+        this.save();
+        this.save = null;
+      } else {
+        this.modalService.cancel();
+      }
+    });
   }
 }

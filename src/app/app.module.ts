@@ -20,6 +20,7 @@ import { ToggleComponent } from './components/shared/toggle/toggle.component';
 import { TasksComponent } from './components/pages/page/tower/tasks/tasks.component';
 import { ColorPipe } from './pipes/color.pipe';
 import { BlocksComponent } from './components/modal/modals/blocks/blocks.component';
+import { FormatDatePipe } from './pipes/format-date.pipe';
 
 @NgModule({
   declarations: [
@@ -39,7 +40,8 @@ import { BlocksComponent } from './components/modal/modals/blocks/blocks.compone
     ToggleComponent,
     TasksComponent,
     ColorPipe,
-    BlocksComponent
+    BlocksComponent,
+    FormatDatePipe
   ],
   imports: [BrowserModule, AppRoutingModule, FormsModule, BrowserAnimationsModule, DragDropModule],
   providers: [],

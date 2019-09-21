@@ -1,5 +1,6 @@
 export class Unique {
-  protected static nextId = 0;
+  private static nextId = 0;
+  private static store;
 
   constructor() {
     this.setUniqueness();
@@ -10,11 +11,13 @@ export class Unique {
   }
 
   private _id: number;
+
   get id(): number {
     return this._id;
   }
 
   private _copies = 0;
+
   get copies(): number {
     return this._copies;
   }

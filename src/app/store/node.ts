@@ -10,7 +10,7 @@ export abstract class Node extends Unique implements NodeState {
 
   protected constructor(children: Array<InnerNode> = []) {
     super();
-    children.map(c => (c.parent = this));
+    children.forEach(c => (c.parent = this));
   }
   protected abstract changeKeys<T extends NodeState>(props: Partial<T>): this;
 

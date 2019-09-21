@@ -1,8 +1,5 @@
-<div
-  class="select-add {{ onlyShadowBorder ? 'shadow-border' : '' }} {{ disabled ? 'disabled' : '' }}"
-  (click)="$event.stopPropagation()"
->
-  <div #top class="top" (click)="!editMode && !disabled && toggle()">
+<div class="select-add {{ onlyShadowBorder ? 'shadow-border' : '' }}" (click)="$event.stopPropagation()">
+  <div #top class="top" (click)="!editMode && toggle()">
     <p [innerHTML]="selected ? selected : placeholder" *ngIf="!editMode || !selected; else editableSelected"></p>
     <ng-template #editableSelected>
       <input type="text" [value]="selected" (change)="changeOption(selected, $event)" />
@@ -27,7 +24,7 @@
       <input
         type="text"
         *ngIf="options.length <= maxItemCount"
-        placeholder="Add a value…"
+        [placeholder]="newValuePlaceholder"
         [(ngModel)]="newOption"
         (keyup)="handleKeys($event)"
       />

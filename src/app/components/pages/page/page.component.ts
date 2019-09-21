@@ -40,9 +40,7 @@ export class PageComponent implements OnInit {
       if (value) {
         this.towers = value.towers.map((t, index) => {
           if (index < this.towers.length) {
-            if (this.towers[index].getValue() !== t) {
-              this.towers[index].next(t);
-            }
+            this.towers[index].next(t);
             return this.towers[index];
           }
           return new BehaviorSubject(t);

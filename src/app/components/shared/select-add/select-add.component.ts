@@ -8,18 +8,15 @@ import { CancelService } from '../../../services/cancel.service';
 })
 export class SelectAddComponent {
   @Input() placeholder = 'Add a new value…';
+  @Input() newValuePlaceholder = 'Add a value…';
   @Input() maxItemCount = 7;
   @Input() options: string[];
   @Input() alwaysDropShadow = false;
   @Input() onlyShadowBorder = false;
   @Input() editable = false;
-  @Input() disabled = false;
 
   @Input() set default(value: string) {
     this.selected = value;
-    if (value) {
-      this.value.emit(value);
-    }
   }
 
   backgroundHeight: string;

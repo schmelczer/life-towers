@@ -4,6 +4,7 @@ import { ModalService } from '../../../../services/modal.service';
 import { Observable } from 'rxjs/internal/Observable';
 import { Range } from '../../../../interfaces/range';
 import { top } from '../../../../utils/top';
+import { CancelService } from '../../../../services/cancel.service';
 
 type StyledBlock = ColoredBlock & { style: { [p: string]: string }; shouldDraw: boolean; cssClass: string };
 
@@ -35,10 +36,13 @@ export class TowerComponent implements OnInit {
     return this.styledBlocks.filter(b => b.shouldDraw);
   }
 
-  public constructor(private modalService: ModalService, private changeDetection: ChangeDetectorRef) {}
+  public constructor(private modalService: ModalService, private changeDetection: ChangeDetectorRef) {
+    console.log('oo');
+  }
 
   ngOnInit() {
     this.tower$.subscribe(value => {
+      console.log(this.tower, value);
       if (value) {
         this.styledBlocks = value.coloredBlocks
           .filter(b => b.isDone)
@@ -65,13 +69,17 @@ export class TowerComponent implements OnInit {
             const lastBlock = top(this.styledBlocks);
             if (lastBlock) {
               lastBlock.style = { transform: 'translateY(500%)', opacity: '0' };
-              setTimeout(() => this.makeBlockDescend(lastBlock), 0);
+              setTimeout(() => {
+                this.makeBlockDescend(lastBlock);
+                this.changeDetection.markForCheck();
+              }, 0);
             }
           }
         }
 
         this.tasks = value.coloredBlocks.filter(block => !block.isDone);
         this.tower = value;
+        this.changeDetection.markForCheck();
       }
     });
 
@@ -112,8 +120,6 @@ export class TowerComponent implements OnInit {
       });
     } catch {
       // pass
-    } finally {
-      this.changeDetection.markForCheck();
     }
   }
 }

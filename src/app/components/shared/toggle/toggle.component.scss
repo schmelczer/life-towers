@@ -59,17 +59,15 @@
       }
     }
 
-    &:not(.disabled) {
-      input[type='checkbox'] {
-        @media (min-width: $mobile-width) {
-          &:hover:after {
-            box-shadow: $shadow;
-            transform: translateX(2px);
-          }
+    input[type='checkbox'] {
+      @media (min-width: $mobile-width) {
+        &:hover:after {
+          box-shadow: $shadow;
+          transform: translateX(2px);
+        }
 
-          &.on:hover:after {
-            transform: translateX(-2px);
-          }
+        &.on:hover:after {
+          transform: translateX(-2px);
         }
       }
     }

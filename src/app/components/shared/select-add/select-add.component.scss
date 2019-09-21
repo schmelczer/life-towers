@@ -5,12 +5,6 @@ $inner-padding: var(--medium-padding);
   width: 100%;
   position: relative;
 
-  &.disabled {
-    .top {
-      cursor: not-allowed !important;
-    }
-  }
-
   .top,
   .bottom {
     padding: $inner-padding;

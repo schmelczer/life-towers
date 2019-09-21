@@ -12,7 +12,7 @@ export class BlockComponent {
   @Input() block: ColoredBlock;
   @Input() tower$: Observable<Tower>;
 
-  constructor(private modalService: ModalService, private changeDetection: ChangeDetectorRef) {}
+  constructor(private modalService: ModalService) {}
 
   async handleClick() {
     try {
@@ -23,8 +23,6 @@ export class BlockComponent {
       });
     } catch {
       // pass
-    } finally {
-      this.changeDetection.markForCheck();
     }
   }
 }
