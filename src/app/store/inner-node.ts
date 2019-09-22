@@ -10,8 +10,8 @@ export class InnerNode extends Node implements InnerNodeState {
   private nextVersion: this = null;
   readonly children: Array<InnerNode>;
 
-  constructor(children: Array<InnerNode> = []) {
-    super(children);
+  protected constructor(children: Array<InnerNode> = [], id?: string) {
+    super(children, id);
     this.children = children;
   }
 

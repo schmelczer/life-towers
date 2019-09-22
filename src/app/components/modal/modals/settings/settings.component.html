@@ -14,4 +14,8 @@
 
 <p *ngIf="page.towers.length == 5">There can be a maximum of <strong>5</strong> towers on each page.</p>
 
+<input id="token" type="text" [(ngModel)]="token" />
+
+<button (click)="setNewToken()">Set token</button>
+
 <button (click)="$event.stopPropagation() || deletePage()">Delete current page</button>

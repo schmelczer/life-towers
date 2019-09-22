@@ -31,4 +31,12 @@
   p {
     font-size: var(--medium-font-size);
   }
+
+  input[type='text'] {
+    text-align: center;
+  }
+
+  button {
+    display: block;
+  }
 }

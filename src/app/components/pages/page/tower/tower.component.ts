@@ -36,9 +36,7 @@ export class TowerComponent implements OnInit {
     return this.styledBlocks.filter(b => b.shouldDraw);
   }
 
-  public constructor(private modalService: ModalService, private changeDetection: ChangeDetectorRef) {
-    console.log('oo');
-  }
+  public constructor(private modalService: ModalService, private changeDetection: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.tower$.subscribe(value => {

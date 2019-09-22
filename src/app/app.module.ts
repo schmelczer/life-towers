@@ -21,6 +21,7 @@ import { TasksComponent } from './components/pages/page/tower/tasks/tasks.compon
 import { ColorPipe } from './pipes/color.pipe';
 import { BlocksComponent } from './components/modal/modals/blocks/blocks.component';
 import { FormatDatePipe } from './pipes/format-date.pipe';
+import { HttpClientModule } from '@angular/common/http';
 
 @NgModule({
   declarations: [
@@ -43,7 +44,7 @@ import { FormatDatePipe } from './pipes/format-date.pipe';
     BlocksComponent,
     FormatDatePipe
   ],
-  imports: [BrowserModule, AppRoutingModule, FormsModule, BrowserAnimationsModule, DragDropModule],
+  imports: [BrowserModule, AppRoutingModule, FormsModule, BrowserAnimationsModule, DragDropModule, HttpClientModule],
   providers: [],
   bootstrap: [AppComponent]
 })

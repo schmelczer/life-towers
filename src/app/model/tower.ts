@@ -1,10 +1,9 @@
 import { ITower } from '../interfaces/persistance/tower';
 import { lighten } from '../utils/color';
 import { Block } from './block';
-import { Serializable } from './serializable';
 import { hash } from '../utils/hash';
 import { IColor } from '../interfaces/color';
-import { InnerNodeState } from '../store/inner-node';
+import { InnerNode, InnerNodeState } from '../store/inner-node';
 
 export type ColoredBlock = Block & { color: IColor };
 
@@ -12,14 +11,16 @@ export interface TowerState extends ITower, InnerNodeState {
   blocks: Array<Block>;
 }
 
-export class Tower extends Serializable implements ITower, TowerState {
-  tags: string[];
+export class Tower extends InnerNode implements ITower, TowerState {
   readonly name: string;
-  coloredBlocks: Array<ColoredBlock>;
   readonly baseColor: IColor;
+  tags: string[];
+  coloredBlocks: Array<ColoredBlock>;
 
-  constructor(props: ITower) {
-    super(props, 'Tower', props.blocks.map(b => new Block(b)));
+  constructor(props: ITower, referenceDeserializer: (from: any) => any = e => e) {
+    super(props.blocks.map(b => new Block(referenceDeserializer(b), referenceDeserializer)), props.id);
+    this.name = props.name;
+    this.baseColor = props.baseColor;
     this.onAfterClone();
   }
 
@@ -50,6 +51,15 @@ export class Tower extends Serializable implements ITower, TowerState {
 
   getColorOfTag(tag: string): IColor {
     return lighten((hash(tag) - 0.5) * 50, this.baseColor);
+  }
+
+  serialize(referenceSerializer: (ref: object) => any): ITower {
+    return {
+      ...super.serialize(referenceSerializer),
+      name: this.name,
+      baseColor: this.baseColor,
+      blocks: this.blocks.map(referenceSerializer)
+    };
   }
 
   protected onAfterClone() {

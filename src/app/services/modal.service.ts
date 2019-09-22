@@ -5,6 +5,7 @@ import { CancelService } from './cancel.service';
 import { Page } from '../model/page';
 import { Observable } from 'rxjs/internal/Observable';
 import { Block } from '../model/block';
+import { Data } from '../model/data';
 
 export enum ModalType {
   blocks,
@@ -33,8 +34,8 @@ export class ModalService {
     return this.createPromiseAndPushToStack(input, ModalType.blocks);
   }
 
-  showSettings(selectedPage: Observable<Page>): Promise<void> {
-    return this.createPromiseAndPushToStack(selectedPage, ModalType.settings);
+  showSettings(options: { page$: Observable<Page>; data$: Observable<Data> }): Promise<void> {
+    return this.createPromiseAndPushToStack(options, ModalType.settings);
   }
 
   showRemoveTower(tower: Tower): Promise<void> {

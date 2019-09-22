@@ -1,25 +1,24 @@
-import { Serializable } from './serializable';
 import { IPage } from '../interfaces/persistance/page';
+import { Range } from '../interfaces/range';
 import { Tower } from './tower';
-import { InnerNodeState } from '../store/inner-node';
+import { InnerNode, InnerNodeState } from '../store/inner-node';
 
 export interface PageState extends InnerNodeState, IPage {
   towers: Array<Tower>;
 }
 
-export class Page extends Serializable implements IPage, PageState {
+export class Page extends InnerNode implements IPage, PageState {
   readonly name: string;
 
   readonly userData: {
     hideCreateTowerButton: boolean;
-    defaultDateRange: {
-      from: Date;
-      to: Date;
-    };
+    defaultDateRange: Range<Date>;
   };
 
-  constructor(props: IPage) {
-    super(props, 'Page', props.towers.map(t => new Tower(t)));
+  constructor(props: IPage, referenceDeserializer: (from: any) => any = e => e) {
+    super(props.towers.map(t => new Tower(referenceDeserializer(t), referenceDeserializer)), props.id);
+    this.name = props.name;
+    this.userData = props.userData;
   }
 
   get towers(): Array<Tower> {
@@ -83,5 +82,14 @@ export class Page extends Serializable implements IPage, PageState {
     this.changeProps({
       towers: this.towers.filter(t => t !== tower)
     });
+  }
+
+  serialize(referenceSerializer: (ref: object) => any): IPage {
+    return {
+      ...super.serialize(referenceSerializer),
+      name: this.name,
+      userData: this.userData,
+      towers: this.towers.map(referenceSerializer)
+    };
   }
 }

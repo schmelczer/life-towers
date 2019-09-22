@@ -8,8 +8,8 @@ export interface NodeState {
 export abstract class Node extends Unique implements NodeState {
   abstract readonly children: Array<InnerNode>;
 
-  protected constructor(children: Array<InnerNode> = []) {
-    super();
+  protected constructor(children: Array<InnerNode> = [], id?: string) {
+    super(id);
     children.forEach(c => (c.parent = this));
   }
   protected abstract changeKeys<T extends NodeState>(props: Partial<T>): this;
@@ -32,7 +32,7 @@ export abstract class Node extends Unique implements NodeState {
 
   protected _log(indent = ''): string {
     const basicInfo = `${indent} - ${this.constructor.name}, #${this.id}`;
-    let response = `${basicInfo}${' '.repeat(25 - basicInfo.length)}copies: ${this.copies}\n`;
+    let response = `${basicInfo}${' '.repeat(70 - basicInfo.length)}copies: ${this.copies}\n`;
     for (const c of this.children) {
       response += `${c._log(indent + '  ')}`;
     }

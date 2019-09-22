@@ -4,6 +4,8 @@ import { DataService } from '../../services/data.service';
 import { ModalService } from '../../services/modal.service';
 import { BehaviorSubject } from 'rxjs/internal/BehaviorSubject';
 import { Observable } from 'rxjs/internal/Observable';
+import { Data } from '../../model/data';
+import { of } from 'rxjs/internal/observable/of';
 
 const USER_DATA_KEY = 'life-towers.user-data.v.2';
 
@@ -17,6 +19,7 @@ export class PagesComponent implements OnInit {
   @ViewChild('page') page: ElementRef;
   @ViewChild('bottom') bottom: ElementRef;
 
+  data: Data;
   pages: Array<Page>;
   isDragHappening = false;
 
@@ -44,8 +47,10 @@ export class PagesComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.dataService.children$.subscribe(pages => {
-      if (pages) {
+    this.dataService.children$.subscribe(dataContainer => {
+      if (dataContainer && dataContainer.length > 0) {
+        this.data = dataContainer[0];
+        const pages = this.data.pages;
         if (this.pages && !pages.includes(this._selectedPage.getValue().latestVersion)) {
           this.selectedPageName = null;
         }
@@ -82,7 +87,7 @@ export class PagesComponent implements OnInit {
 
     if (this.pages && name) {
       if (!this.pageNames.includes(name)) {
-        this.dataService.addPage(name);
+        this.data.addPage(name);
       }
 
       const index = this.pageNames.indexOf(name);
@@ -95,7 +100,10 @@ export class PagesComponent implements OnInit {
 
   async openSettings() {
     try {
-      await this.modalService.showSettings(this.selectedPage$);
+      await this.modalService.showSettings({
+        page$: this.selectedPage$,
+        data$: of(this.data)
+      });
     } catch {
       // pass
     } finally {
