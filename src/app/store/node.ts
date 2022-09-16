@@ -40,7 +40,7 @@ export abstract class Node extends Unique implements NodeState {
   }
 
   public log() {
-    console.log(this._log());
-    console.log(`All in all, there are ${Unique.ObjectCount} objects.`);
+    // console.log(this._log());
+    //  console.log(`All in all, there are ${Unique.ObjectCount} objects.`);
   }
 }

@@ -50,7 +50,7 @@ export class SelectAddComponent {
   }
 
   changeOption(from: string, event) {
-    console.log(event);
+    // console.log(event);
     this.optionChange.emit({
       from,
       to: event.target.value
@@ -99,7 +99,7 @@ export class SelectAddComponent {
     if (this.isOpen && this.top && this.bottom) {
       const topHeight = this.top.nativeElement.clientHeight;
       const bottomHeight = this.bottom.nativeElement.clientHeight;
-      console.log(topHeight, bottomHeight);
+      // console.log(topHeight, bottomHeight);
       return `${topHeight + bottomHeight}px`;
     }
     return `100%`;

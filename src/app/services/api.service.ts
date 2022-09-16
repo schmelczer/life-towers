@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Unique } from '../store/unique';
 
-const API_URI = 'https://schmelczer.dev/api/store/';
+const API_URI = 'https://store.schmelczer.dev/api/store/';
 
 @Injectable({
   providedIn: 'root'

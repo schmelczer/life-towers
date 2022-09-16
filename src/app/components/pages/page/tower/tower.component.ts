@@ -40,7 +40,7 @@ export class TowerComponent implements OnInit {
 
   ngOnInit() {
     this.tower$.subscribe(value => {
-      console.log(this.tower, value);
+      // console.log(this.tower, value);
       if (value) {
         this.styledBlocks = value.coloredBlocks
           .filter(b => b.isDone)

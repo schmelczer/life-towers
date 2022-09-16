@@ -19,12 +19,13 @@
     </div>
   </div>
 
-  <label for="tower-name" class="hidden">Card name</label>
-  <input
-    id="tower-name"
-    type="text"
-    placeholder="name…"
-    [(ngModel)]="towerName"
-    [ngStyle]="{ color: (tower$ | async)?.baseColor | color }"
-  />
+  <label class="hidden">
+    Card name
+    <input
+      type="text"
+      placeholder="name…"
+      [(ngModel)]="towerName"
+      [ngStyle]="{ color: (tower$ | async)?.baseColor | color }"
+    />
+  </label>
 </div>

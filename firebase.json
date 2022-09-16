@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "public": "dist/frontend",
+    "site": "towers-schmelczer-dev",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

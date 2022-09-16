@@ -8,10 +8,10 @@ export class Unique implements ISerializable, IUnique {
   constructor(id?: string) {
     if (id) {
       this._id = id;
-      console.log('got id ' + id);
+      // console.log('got id ' + id);
     } else {
       this.setUniqueness();
-      console.log('unique ' + this.id);
+      // console.log('unique ' + this.id);
     }
   }
 
