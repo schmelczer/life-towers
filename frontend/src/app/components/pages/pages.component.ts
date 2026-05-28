@@ -1,113 +1,108 @@
-import { ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { Page } from '../../model/page';
-import { DataService } from '../../services/data.service';
-import { ModalService } from '../../services/modal.service';
-import { BehaviorSubject } from 'rxjs/internal/BehaviorSubject';
-import { Observable } from 'rxjs/internal/Observable';
-import { Data } from '../../model/data';
-import { of } from 'rxjs/internal/observable/of';
-
-const USER_DATA_KEY = 'life-towers.user-data.v.2';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  computed,
+  effect,
+} from '@angular/core';
+import { StoreService } from '../../services/store.service';
+import { PageComponent } from '../page/page.component';
+import { ModalComponent } from '../modal/modal.component';
+import { SettingsComponent, UpdatePagePayload } from '../modal/settings.component';
+import { SelectAddComponent } from '../shared/select-add/select-add.component';
+import { WelcomeComponent } from '../welcome/welcome.component';
+import { Page } from '../../models';
 
 @Component({
-  selector: 'app-pages',
+  selector: 'lt-pages',
+  standalone: true,
+  imports: [PageComponent, ModalComponent, SettingsComponent, SelectAddComponent, WelcomeComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './pages.component.html',
-  styleUrls: ['./pages.component.scss']
+  styleUrl: './pages.component.scss',
 })
-export class PagesComponent implements OnInit {
-  @ViewChild('top') top: ElementRef;
-  @ViewChild('page') page: ElementRef;
-  @ViewChild('bottom') bottom: ElementRef;
+export class PagesComponent {
+  protected readonly store = inject(StoreService);
 
-  data: Data;
-  pages: Array<Page>;
-  isDragHappening = false;
+  /** ID of currently selected page within store.pages(). */
+  private readonly selectedPageId = signal<string | null>(null);
 
-  get pageNames() {
-    if (this.pages) {
-      return this.pages.map(p => p.name);
-    }
-    return [];
-  }
+  readonly showSettings = signal(false);
+  readonly dragHappening = signal(false);
+  readonly showWelcome = signal(false);
 
-  selectedPageName: string;
-
-  private readonly _selectedPage: BehaviorSubject<Page> = new BehaviorSubject(null);
-  readonly selectedPage$: Observable<Page> = this._selectedPage.asObservable();
-
-  constructor(
-    public dataService: DataService,
-    private modalService: ModalService,
-    private changeDetection: ChangeDetectorRef
-  ) {
-    const userData = JSON.parse(window.localStorage.getItem(USER_DATA_KEY));
-    if (userData !== null) {
-      this.selectedPageName = userData.selectedPage;
-    }
-  }
-
-  ngOnInit() {
-    this.dataService.children$.subscribe(dataContainer => {
-      if (dataContainer && dataContainer.length > 0) {
-        this.data = dataContainer[0];
-        const pages = this.data.pages;
-        if (this.pages && !pages.includes(this._selectedPage.getValue().latestVersion)) {
-          this.selectedPageName = null;
-        }
-        this.pages = pages;
-        this.selectPage(this.selectedPageName);
+  constructor() {
+    effect(() => {
+      if (!this.store.loading() && this.store.pages().length === 0) {
+        this.showWelcome.set(true);
+      } else if (this.store.pages().length > 0) {
+        this.showWelcome.set(false);
       }
     });
   }
 
-  changeName({ from, to }: { from: string; to: string }) {
-    const page = this.pages.find(p => p.name === from);
+  onLoadExample(): void {
+    this.store.loadExample();
+    this.showWelcome.set(false);
+  }
+
+  readonly pageNames = computed(() => this.store.pages().map((p) => p.name));
+
+  readonly selectedPage = computed<Page | null>(() => {
+    const pages = this.store.pages();
+    if (pages.length === 0) return null;
+    const id = this.selectedPageId();
+    if (id) {
+      const found = pages.find((p) => p.id === id);
+      if (found) return found;
+    }
+    // Default to first page.
+    return pages[0] ?? null;
+  });
+
+  readonly selectedPageName = computed(() => this.selectedPage()?.name ?? null);
+
+  readonly selectedPageIndex = computed(() => {
+    const page = this.selectedPage();
+    if (!page) return -1;
+    return this.store.pages().findIndex((p) => p.id === page.id);
+  });
+
+  onSelectPage(index: number): void {
+    const pages = this.store.pages();
+    const page = pages[index];
     if (page) {
-      if (from === this.selectedPageName) {
-        this.selectedPageName = to;
-      }
-      page.changeName(to);
+      this.selectedPageId.set(page.id);
     }
   }
 
-  selectPage(name: string) {
-    if (!name) {
-      if (this.pages && this.pages.length > 0) {
-        name = this.pages[0].name;
-      }
+  onAddPage(name: string): void {
+    this.store.addPage(name);
+    // Select the newly added page.
+    const pages = this.store.pages();
+    const newPage = pages[pages.length - 1];
+    if (newPage) {
+      this.selectedPageId.set(newPage.id);
     }
-    this.selectedPageName = name;
-
-    window.localStorage.setItem(
-      USER_DATA_KEY,
-      JSON.stringify({
-        selectedPage: name
-      })
-    );
-
-    if (this.pages && name) {
-      if (!this.pageNames.includes(name)) {
-        this.data.addPage(name);
-      }
-
-      const index = this.pageNames.indexOf(name);
-      this._selectedPage.next(this.pages[index]);
-      return;
-    }
-
-    this._selectedPage.next(null);
   }
 
-  async openSettings() {
-    try {
-      await this.modalService.showSettings({
-        page$: this.selectedPage$,
-        data$: of(this.data)
-      });
-    } catch {
-      // pass
-    } finally {
-      this.changeDetection.markForCheck();
+  onUpdatePage(payload: UpdatePagePayload): void {
+    const page = this.selectedPage();
+    if (page) {
+      this.store.updatePage(page.id, payload);
     }
+  }
+
+  onRemovePage(): void {
+    const page = this.selectedPage();
+    if (!page) return;
+    this.store.deletePage(page.id);
+    this.selectedPageId.set(null);
+    this.showSettings.set(false);
+  }
+
+  onSwitchAccount(token: string): void {
+    this.store.switchToken(token);
   }
 }

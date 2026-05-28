@@ -1,1 +1,35 @@
-**/node_modules
+# Version control
+.git
+.forgejo
+
+# Data volume (never bake in runtime data)
+data/
+
+# Test artefacts (Playwright)
+**/test-results/
+**/playwright-report/
+**/visuals/
+
+# Build artifacts and caches
+**/node_modules/
+**/dist/
+**/.angular/
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+
+# Docs (the API spec is the runtime contract — but the image doesn't need it)
+docs/
+*.md
+README.md
+
+# Secrets — never bake into images
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+
+# OS artefacts
+.DS_Store

@@ -1,83 +1,28 @@
-version: "3.8"
-
 services:
-  towers-ingress:
-    init: true
-    depends_on:
-      - store
-    image: schmelczera/towers-ingress
-    networks:
-      - network
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 32M
-        reservations:
-          cpus: "0.1"
-          memory: 16M
-      placement:
-        constraints:
-          - "node.hostname == node-2"
-      update_config:
-        parallelism: 1
-        failure_action: rollback
-        delay: 10s
-        monitor: 10s
-      restart_policy:
-        condition: on-failure
-        window: 30s
+  life-towers:
+    # Default to a registry image so `docker compose pull && up -d` deploys
+    # a new build. Override LIFE_TOWERS_IMAGE in your `.env` to pin a tag,
+    # or set it to e.g. `life-towers:local` and uncomment `build: .` for
+    # local builds.
+    image: ${LIFE_TOWERS_IMAGE:-life-towers:local}
+    # build: .  # uncomment for local builds (or use docker-compose.dev.yml)
+    pull_policy: ${LIFE_TOWERS_PULL_POLICY:-missing}
+    ports:
+      - "${LIFE_TOWERS_PORT:-8000}:8000"
     volumes:
-      - sockets:/var/www/sockets
-
-  towers-store:
-    init: true
-    image: schmelczera/towers-store
-    networks:
-      - network
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-        reservations:
-          cpus: "0.05"
-          memory: 32M
-      placement:
-        constraints:
-          - "node.hostname == node-2"
-      restart_policy:
-        condition: on-failure
-        window: 30s
-    volumes:
-      - sockets:/home/backend/sockets
-
-  towers-db:
-    init: true
-    image: postgres:12.1-alpine
-    networks:
-      - network
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-        reservations:
-          cpus: "0.05"
-          memory: 32M
-      restart_policy:
-        condition: on-failure
-        window: 30s
-    volumes:
-      - /shared/towers/db:/var/lib/postgresql/data
-
-networks:
-  network:
-    driver: overlay
+      # Named volume inherits ownership from the image (UID 1000 / appuser).
+      # To switch to a bind mount for easy host-side backups, replace with:
+      #   - ./data:/data
+      # and first run: `mkdir -p data && sudo chown 1000:1000 data`.
+      - life-towers-data:/data
+    environment:
+      LIFE_TOWERS_ALLOWED_ORIGIN: "${LIFE_TOWERS_ALLOWED_ORIGIN:-}"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  sockets:
-    driver: local
+  life-towers-data:

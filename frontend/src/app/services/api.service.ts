@@ -1,53 +1,35 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Unique } from '../store/unique';
+import { firstValueFrom } from 'rxjs';
+import { TreeDto } from '../models';
 
-const API_URI = 'https://store.schmelczer.dev/api/store/';
-
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class ApiService {
-  constructor(private http: HttpClient) {}
+  private readonly http = inject(HttpClient);
 
-  private static getAuthorizationHeader(id: string): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `life-towers-v3 ${id}`);
+  health(): Promise<{ status: string }> {
+    return firstValueFrom(this.http.get<{ status: string }>('/api/v1/health'));
   }
 
-  async track(id: string): Promise<void> {
-    await this.http.post(`${API_URI}me`, {}, { headers: ApiService.getAuthorizationHeader(id) }).toPromise();
+  register(token: string): Promise<{ user_id: string }> {
+    return firstValueFrom(
+      this.http.post<{ user_id: string }>('/api/v1/register', { token }),
+    );
   }
 
-  async register(id: string): Promise<void> {
-    await this.http.post(API_URI, { token: id }).toPromise();
+  getData(token: string): Promise<TreeDto> {
+    return firstValueFrom(
+      this.http.get<TreeDto>('/api/v1/data', { headers: this.authHeaders(token) }),
+    );
   }
 
-  async getObject(userId: string, objectId: string): Promise<Unique> {
-    return await this.http
-      .get<Unique>(`${API_URI}me/${objectId}`, { headers: ApiService.getAuthorizationHeader(userId) })
-      .toPromise();
+  putData(token: string, tree: TreeDto): Promise<void> {
+    return firstValueFrom(
+      this.http.put<void>('/api/v1/data', tree, { headers: this.authHeaders(token) }),
+    );
   }
 
-  async postObject(userId: string, objectId: string, serializedObject: string): Promise<void> {
-    await this.http
-      .post(
-        `${API_URI}me/${objectId}`,
-        { data: serializedObject },
-        { headers: ApiService.getAuthorizationHeader(userId) }
-      )
-      .toPromise();
-  }
-
-  async getRootId(userId: string): Promise<string> {
-    return await this.http
-      // @ts-ignore
-      .get<string>(`${API_URI}me/root`, { headers: ApiService.getAuthorizationHeader(userId), responseType: 'text' })
-      .toPromise();
-  }
-
-  async setRootId(userId: string, rootId: string): Promise<void> {
-    await this.http
-      .put(`${API_URI}me/root`, { root_id: rootId }, { headers: ApiService.getAuthorizationHeader(userId) })
-      .toPromise();
+  private authHeaders(token: string): HttpHeaders {
+    return new HttpHeaders({ Authorization: `Bearer ${token}` });
   }
 }

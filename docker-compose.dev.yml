@@ -1,0 +1,25 @@
+# Dev / e2e compose. Uses an ephemeral anonymous volume so each `up` starts
+# with a clean SQLite database — ideal for Playwright runs that expect a
+# fresh state.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up --build -d
+#   # ... run tests against http://localhost:8000 ...
+#   docker compose -f docker-compose.dev.yml down -v
+
+services:
+  life-towers:
+    build: .
+    image: life-towers:dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - /data
+    environment:
+      LIFE_TOWERS_ALLOWED_ORIGIN: ""
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s

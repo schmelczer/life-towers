@@ -1,22 +1,44 @@
 <div class="select-add-container">
-  <!-- wrapper for easier styling -->
-  <app-select-add
-    [options]="pageNames"
-    [default]="(selectedPage$ | async)?.name"
-    (value)="selectPage($event)"
-    (optionChange)="changeName($event)"
-    [placeholder]="'Add a new page…'"
-    [editable]="true"
-  ></app-select-add>
+  <lt-select-add
+    [options]="pageNames()"
+    [selectedIndex]="selectedPageIndex()"
+    placeholder="Add a new page…"
+    (selectionChange)="onSelectPage($event)"
+    (add)="onAddPage($event)"
+  />
 </div>
-<!-- wrapper for easier styling -->
 
 <div class="page-container">
-  <!-- wrapper for easier styling -->
-  <app-page [page$]="selectedPage$" (isDragHappening)="isDragHappening = $event"></app-page>
+  @if (selectedPage(); as page) {
+    <lt-page [page]="page" (dragHappening)="dragHappening.set($event)" />
+  } @else {
+    <p>Add a new page to get started!</p>
+  }
 </div>
-<!-- wrapper for easier styling -->
 
-<button [ngClass]="isDragHappening ? 'transparent' : ''" (click)="$event.stopPropagation(); openSettings()">
+<button [class.transparent]="dragHappening()" (click)="showSettings.set(true)">
   Settings
 </button>
+
+@if (showSettings()) {
+  <lt-modal (close)="showSettings.set(false)">
+    <lt-settings
+      [token]="store.token()"
+      [page]="selectedPage()"
+      (close)="showSettings.set(false)"
+      (updatePage)="onUpdatePage($event)"
+      (deletePage)="onRemovePage()"
+      (switchAccount)="onSwitchAccount($event)"
+    />
+  </lt-modal>
+}
+
+@if (showWelcome()) {
+  <lt-modal (close)="showWelcome.set(false)">
+    <lt-welcome
+      (close)="showWelcome.set(false)"
+      (startFresh)="showWelcome.set(false)"
+      (loadExample)="onLoadExample()"
+    />
+  </lt-modal>
+}

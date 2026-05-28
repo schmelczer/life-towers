@@ -1,0 +1,69 @@
+<section
+  class="towers"
+  cdkDropList
+  cdkDropListOrientation="horizontal"
+  (cdkDropListDropped)="onTowerDropped($event)"
+>
+  @for (tower of page().towers; track tower.id) {
+    <lt-tower
+      cdkDrag
+      [cdkDragDisabled]="modalOpen()"
+      [tower]="tower"
+      [dateRange]="dateRange()"
+      [keepTasksOpen]="page().keep_tasks_open"
+      (cdkDragStarted)="onTowerDragStart(tower.id)"
+      (updateTower)="onUpdateTower(tower.id, $event)"
+      (deleteTowerRequest)="onDeleteTower(tower.id)"
+      (saveBlock)="onSaveBlock(tower.id, $event)"
+      (addBlock)="onAddBlock(tower.id, $event)"
+      (deleteBlock)="onDeleteBlock(tower.id, $event)"
+    />
+  }
+  @if (!page().hide_create_tower_button) {
+    <div class="add-tower-wrapper">
+      <img class="add-tower" src="assets/plus-sign.svg" alt="Add tower" (click)="showAddTower.set(true)" />
+    </div>
+  }
+</section>
+
+<!-- Trash zone is positioned relative to :host, not .towers — matches legacy. -->
+<img
+  class="trash"
+  src="assets/trash.svg"
+  alt="Delete tower"
+  [class.active]="isDragging()"
+  (pointerenter)="onTrashEnter()"
+  (pointerleave)="onTrashLeave()"
+/>
+
+@if (showSlider()) {
+  <div class="double-slider-container" [class.transparent]="isDragging()">
+    <lt-double-slider
+      [values]="blockDates()"
+      [labels]="dateLabels()"
+      (rangeChange)="onSliderRangeChange($event)"
+    />
+  </div>
+}
+
+@if (showAddTower()) {
+  <lt-modal title="New Tower" (close)="showAddTower.set(false)">
+    <lt-tower-settings [tower]="null" (save)="onAddTower($event)" />
+  </lt-modal>
+}
+
+@if (confirmDeleteTowerId(); as towerId) {
+  <lt-modal (close)="cancelTowerDelete()">
+    <div class="confirm-delete">
+      <div class="header">
+        <div class="exit" (click)="cancelTowerDelete()" role="button" aria-label="Cancel"></div>
+        <h2>Delete tower</h2>
+      </div>
+      <p>Delete <strong>{{ confirmDeleteTowerName() || 'this tower' }}</strong> and all of its blocks? This can't be undone.</p>
+      <div class="confirm-buttons">
+        <button type="button" (click)="cancelTowerDelete()">Cancel</button>
+        <button type="button" class="danger" (click)="confirmTowerDelete()">Delete tower</button>
+      </div>
+    </div>
+  </lt-modal>
+}
