@@ -3,9 +3,7 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  inject,
   signal,
-  computed,
   effect,
   viewChild,
   ElementRef,
@@ -15,7 +13,6 @@ import {
 } from '@angular/core';
 import { Block, HslColor } from '../../models';
 import { SelectAddComponent } from '../shared/select-add/select-add.component';
-import { ToggleComponent } from '../shared/toggle/toggle.component';
 import { getColorOfTag } from '../../utils/color';
 
 export interface BlockEditSave {
@@ -24,25 +21,41 @@ export interface BlockEditSave {
   tag: string;
   description: string;
   is_done: boolean;
+  difficulty: number;
 }
 
 interface EditedValue {
   tag: string;
   description: string;
   is_done: boolean;
+  difficulty: number;
+}
+
+function clampDifficulty(value: number): number {
+  return Math.max(1, Math.min(100, value));
+}
+
+export function createDoneValue(defaultDone: boolean, currentDone: boolean, edited: boolean): boolean {
+  return edited ? currentDone : defaultDone;
 }
 
 @Component({
   selector: 'lt-block-edit',
   standalone: true,
-  imports: [SelectAddComponent, ToggleComponent],
+  imports: [SelectAddComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    @if (viewTitle()) {
+      <h2 class="view-title">{{ viewTitle() }}</h2>
+    }
+
     <section
       #container
       class="carousel"
       (scroll)="onScroll()"
       (click)="onBackdropClick($event)"
+      (keydown.enter)="onBackdropClick($any($event))"
+      tabindex="-1"
     >
       <div class="card placeholder"></div>
 
@@ -51,17 +64,27 @@ interface EditedValue {
           class="card"
           [class.active]="activeIdx() === i + 1"
           [class.near-active]="activeIdx() === i || activeIdx() === i + 2"
+          role="button"
+          tabindex="0"
+          [attr.aria-label]="'Focus ' + (editedFor(b.id).tag || 'block')"
           (click)="onCardClick(i + 1)"
+          (keydown.enter)="onCardClick(i + 1)"
+          (keydown.space)="$event.preventDefault(); onCardClick(i + 1)"
         >
           <div class="mask"></div>
 
           <div class="header">
-            <div class="exit" (click)="close.emit(); $event.stopPropagation()"></div>
+            <button
+              class="exit"
+              type="button"
+              aria-label="Close"
+              (click)="close.emit(); $event.stopPropagation()"
+            ></button>
             <div
               class="block-dot"
               [style.background-color]="colorOfTagForBlock(b.id)"
             ></div>
-            <h1>{{ formatDate(b.created_at) }}</h1>
+            <h1>{{ formatDate(b.created_at, true) }}</h1>
           </div>
 
           <div class="select-add-container">
@@ -70,7 +93,7 @@ interface EditedValue {
               [selected]="editedFor(b.id).tag"
               [alwaysDropShadow]="true"
               [onlyShadowBorder]="true"
-              placeholder="Tag this item…"
+              [placeholder]="tagPlaceholder('Tag this item…')"
               (select)="updateTag(b.id, $event)"
               (add)="updateTag(b.id, $event)"
             />
@@ -78,18 +101,40 @@ interface EditedValue {
 
           <textarea
             placeholder="Write a description here…"
+            maxlength="10000"
             [value]="editedFor(b.id).description"
             (input)="updateDescription(b.id, $any($event.target).value)"
             (blur)="flushExisting(b.id)"
           ></textarea>
 
-          <div>
-            <lt-toggle
+          <label class="done-checkbox">
+            <input
+              type="checkbox"
               [checked]="editedFor(b.id).is_done"
-              (checkedChange)="updateDone(b.id, $event)"
-              offLabel="This task hasn't been finished yet"
-              onLabel="Goal already accomplished"
+              (change)="updateDone(b.id, $any($event.target).checked)"
             />
+            <span>Already done</span>
+          </label>
+
+          <div class="difficulty">
+            <span class="label">Difficulty</span>
+            <div class="stepper">
+              <button
+                type="button"
+                class="step"
+                aria-label="Decrease difficulty"
+                [disabled]="editedFor(b.id).difficulty <= 1"
+                (click)="updateDifficulty(b.id, -1); $event.stopPropagation()"
+              >−</button>
+              <span class="value">{{ editedFor(b.id).difficulty }}</span>
+              <button
+                type="button"
+                class="step"
+                aria-label="Increase difficulty"
+                [disabled]="editedFor(b.id).difficulty >= 100"
+                (click)="updateDifficulty(b.id, 1); $event.stopPropagation()"
+              >+</button>
+            </div>
           </div>
 
           <div class="bottom">
@@ -102,12 +147,22 @@ interface EditedValue {
         class="card create-card"
         [class.active]="activeIdx() === blocks().length + 1"
         [class.near-active]="activeIdx() === blocks().length"
+        role="button"
+        tabindex="0"
+        aria-label="Focus create card"
         (click)="onCardClick(blocks().length + 1)"
+        (keydown.enter)="onCardClick(blocks().length + 1)"
+        (keydown.space)="$event.preventDefault(); onCardClick(blocks().length + 1)"
       >
         <div class="mask"></div>
 
         <div class="header">
-          <div class="exit" (click)="close.emit(); $event.stopPropagation()"></div>
+          <button
+            class="exit"
+            type="button"
+            aria-label="Close"
+            (click)="close.emit(); $event.stopPropagation()"
+          ></button>
           <div
             class="block-dot"
             [style.background-color]="colorOfNewTag()"
@@ -115,13 +170,13 @@ interface EditedValue {
           <h1>Create now</h1>
         </div>
 
-        <div class="select-add-container">
+        <div class="select-add-container" [class.required-empty]="!newValue().tag">
           <lt-select-add
             [items]="tags()"
             [selected]="newValue().tag"
             [alwaysDropShadow]="true"
             [onlyShadowBorder]="true"
-            placeholder="Set a category…"
+            [placeholder]="tagPlaceholder('Set a category…')"
             (select)="updateNewTag($event)"
             (add)="updateNewTag($event)"
           />
@@ -129,17 +184,39 @@ interface EditedValue {
 
         <textarea
           placeholder="Write a description here…"
+          maxlength="10000"
           [value]="newValue().description"
           (input)="updateNewDescription($any($event.target).value)"
         ></textarea>
 
-        <div>
-          <lt-toggle
+        <label class="done-checkbox">
+          <input
+            type="checkbox"
             [checked]="newValue().is_done"
-            (checkedChange)="updateNewDone($event)"
-            offLabel="This task hasn't been finished yet"
-            onLabel="Goal already accomplished"
+            (change)="updateNewDone($any($event.target).checked)"
           />
+          <span>Already done</span>
+        </label>
+
+        <div class="difficulty">
+          <span class="label">Difficulty</span>
+          <div class="stepper">
+            <button
+              type="button"
+              class="step"
+              aria-label="Decrease difficulty"
+              [disabled]="newValue().difficulty <= 1"
+              (click)="updateNewDifficulty(-1); $event.stopPropagation()"
+            >−</button>
+            <span class="value">{{ newValue().difficulty }}</span>
+            <button
+              type="button"
+              class="step"
+              aria-label="Increase difficulty"
+              [disabled]="newValue().difficulty >= 100"
+              (click)="updateNewDifficulty(1); $event.stopPropagation()"
+            >+</button>
+          </div>
         </div>
 
         <div class="bottom">
@@ -166,17 +243,51 @@ interface EditedValue {
       right: 0;
       bottom: 0;
       z-index: 10001; // above modal backdrop (10000)
+
+      @media (max-height: $min-height) {
+        align-items: flex-start;
+        overflow-y: auto;
+      }
+    }
+
+    .view-title {
+      position: fixed;
+      top: var(--large-padding);
+      left: var(--large-padding);
+      right: var(--large-padding);
+      z-index: 10002;
+      margin: 0;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
     }
 
     .carousel {
+      --title-clearance: calc((var(--large-padding) * 2) + var(--larger-font-size));
       width: 100%;
       height: 100%;
       display: flex;
       align-items: center;
       box-sizing: border-box;
+      padding: var(--title-clearance) 0 var(--large-padding);
       overflow-x: auto;
       overflow-y: hidden;
       scroll-behavior: smooth;
+      scroll-snap-type: x mandatory;
+
+      @media (max-width: $mobile-width) {
+        padding: var(--title-clearance) var(--medium-padding) var(--medium-padding);
+      }
+
+      @media (max-height: $min-height) {
+        min-height: max-content;
+        align-items: flex-start;
+        padding-top: var(--title-clearance);
+        padding-bottom: var(--medium-padding);
+        overflow-y: visible;
+      }
 
       &::-webkit-scrollbar {
         width: 0;
@@ -192,8 +303,12 @@ interface EditedValue {
       flex: 0 0 auto;
       width: 66vw;
       max-width: 400px;
+      scroll-snap-align: center;
       @media (max-width: $mobile-width) {
-        width: 300px;
+        width: min(88vw, 360px);
+        max-width: calc(100vw - (2 * var(--medium-padding)));
+        padding: var(--medium-padding);
+        margin: 0 calc(var(--small-padding) / 2);
         opacity: 1 !important;
       }
       box-sizing: border-box;
@@ -246,6 +361,11 @@ interface EditedValue {
         opacity: 0 !important;
         width: 60vw;
         max-width: 60vw;
+        @media (max-width: $mobile-width) {
+          width: var(--medium-padding);
+          max-width: var(--medium-padding);
+          min-width: var(--medium-padding);
+        }
         box-shadow: none;
         background: transparent;
       }
@@ -253,10 +373,16 @@ interface EditedValue {
       .header {
         @include center-child();
         position: relative;
+        gap: var(--small-padding);
+
+        h1 {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
 
         .exit {
           position: absolute;
-          left: 0;
+          right: 0;
           @include exit();
         }
 
@@ -276,6 +402,132 @@ interface EditedValue {
         }
       }
 
+      .done-checkbox {
+        @include medium-text();
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--small-padding);
+        width: max-content;
+        max-width: 100%;
+        margin: 0 auto var(--medium-padding);
+        cursor: pointer;
+
+        input[type='checkbox'] {
+          -webkit-appearance: none;
+          appearance: none;
+          @include square(22px);
+          flex: 0 0 auto;
+          position: relative;
+          box-sizing: border-box;
+          margin: 0;
+          border: 0;
+          border-radius: 4px;
+          background: $light-color;
+          box-shadow: $shadow-border;
+          cursor: pointer;
+          transition: background-color $short-animation-time, box-shadow $long-animation-time, transform $short-animation-time;
+
+          &::after {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 3px;
+            width: 6px;
+            height: 12px;
+            border: solid $light-color;
+            border-width: 0 2px 2px 0;
+            opacity: 0;
+            transform: rotate(45deg) scale(0.8);
+            transition: opacity $short-animation-time, transform $short-animation-time;
+          }
+
+          &:checked {
+            background: $text-color;
+
+            &::after {
+              opacity: 1;
+              transform: rotate(45deg) scale(1);
+            }
+          }
+
+          &:hover,
+          &:focus-visible {
+            box-shadow: $shadow;
+          }
+
+          &:active {
+            transform: scale(0.95);
+          }
+        }
+
+        span {
+          line-height: 1.3;
+        }
+      }
+
+      .difficulty {
+        @include medium-text();
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--small-padding);
+        width: max-content;
+        max-width: 100%;
+        margin: 0 auto var(--medium-padding);
+
+        .stepper {
+          display: flex;
+          align-items: center;
+          gap: var(--small-padding);
+
+          .value {
+            min-width: 1.5em;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+          }
+
+          button.step {
+            all: unset;                       // strip native + global button styles
+            @include square(22px);
+            @include center-child();
+            flex: 0 0 auto;
+            box-sizing: border-box;
+            border-radius: 4px;
+            background: $light-color;
+            box-shadow: $shadow-border;
+            cursor: pointer;
+            // all:unset drops the font to serif and the global button's hover
+            // underline (button::after) survives the reset — re-assert both.
+            font: bold 18px/1 $normal-font;
+            color: $text-color;
+            user-select: none;
+            transition: box-shadow $long-animation-time, transform $short-animation-time, opacity $short-animation-time;
+
+            &::after { content: none; }
+
+            @media (max-width: $mobile-width) {
+              @include square(26px);
+            }
+
+            &:hover,
+            &:focus-visible {
+              box-shadow: $shadow;
+            }
+
+            &:active {
+              transform: scale(0.95);
+            }
+
+            &:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+              box-shadow: $shadow-border;
+            }
+          }
+        }
+      }
+
       .bottom {
         height: 32px;
         @media (max-width: $mobile-width) {
@@ -291,10 +543,29 @@ interface EditedValue {
           transform: translateY(-50%) translateX(-50%);
         }
       }
+
+      @media (max-width: $mobile-width) {
+        lt-select-add,
+        .done-checkbox {
+          max-width: 100%;
+          width: 100%;
+        }
+
+        .bottom {
+          min-height: 42px;
+
+          button {
+            width: max-content;
+            max-width: 100%;
+            min-height: 42px;
+          }
+        }
+      }
     }
   `,
 })
 export class BlockEditComponent implements AfterViewInit {
+  readonly viewTitle = input<string>('');
   readonly blocks = input.required<Block[]>();
   readonly activeBlockId = input<string | null>(null);
   readonly tags = input<string[]>([]);
@@ -317,7 +588,9 @@ export class BlockEditComponent implements AfterViewInit {
     tag: '',
     description: '',
     is_done: true,
+    difficulty: 1,
   });
+  private newDoneEdited = false;
 
   // 1-based index of the centered card. 0/N+2 are placeholders.
   readonly activeIdx = signal(1);
@@ -334,6 +607,7 @@ export class BlockEditComponent implements AfterViewInit {
           tag: b.tag,
           description: b.description,
           is_done: b.is_done,
+          difficulty: b.difficulty ?? 1,
         });
       }
       untracked(() => this.editedValues.set(m));
@@ -344,11 +618,22 @@ export class BlockEditComponent implements AfterViewInit {
       const t = this.tags();
       untracked(() => {
         const cur = this.newValue();
-        if (!cur.tag && t.length > 0) {
-          this.newValue.set({ ...cur, tag: t[0], is_done: this.defaultDone() });
-        } else if (!cur.tag) {
-          this.newValue.set({ ...cur, is_done: this.defaultDone() });
+        if (!cur.tag) {
+          this.newValue.set({
+            ...cur,
+            tag: t.length > 0 ? t[0] : '',
+          });
         }
+      });
+    });
+
+    effect(() => {
+      const isDone = this.defaultDone();
+      untracked(() => {
+        this.newValue.update((v) => ({
+          ...v,
+          is_done: createDoneValue(isDone, v.is_done, this.newDoneEdited),
+        }));
       });
     });
   }
@@ -373,26 +658,44 @@ export class BlockEditComponent implements AfterViewInit {
         tag: '',
         description: '',
         is_done: false,
+        difficulty: 1,
       }
     );
   }
 
-  colorOfTagForBlock(id: string): string {
-    const v = this.editedFor(id);
-    return v.tag ? getColorOfTag(v.tag, this.baseColor()) : 'transparent';
+  private colorOfTag(tag: string): string {
+    return tag ? getColorOfTag(tag, this.baseColor()) : 'transparent';
   }
 
-  colorOfNewTag = computed(() => {
-    const t = this.newValue().tag;
-    return t ? getColorOfTag(t, this.baseColor()) : 'transparent';
-  });
+  colorOfTagForBlock(id: string): string {
+    return this.colorOfTag(this.editedFor(id).tag);
+  }
 
-  formatDate(ts: number): string {
+  tagPlaceholder(fallback: string): string {
+    return this.tags().length === 0 ? 'No tags yet. Open to create one.' : fallback;
+  }
+
+  colorOfNewTag(): string {
+    return this.colorOfTag(this.newValue().tag);
+  }
+
+  formatDate(ts: number, compact = false): string {
     const d = new Date(ts * 1000);
-    return d.toLocaleDateString(undefined, {
+    if (compact) {
+      return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+    // e.g. "May 28, 2026, 14:32"
+    return d.toLocaleString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   }
 
@@ -413,6 +716,12 @@ export class BlockEditComponent implements AfterViewInit {
     this.flushExisting(id);
   }
 
+  updateDifficulty(id: string, delta: number): void {
+    const next = clampDifficulty(this.editedFor(id).difficulty + delta);
+    this.patchEdited(id, { difficulty: next });
+    this.flushExisting(id);
+  }
+
   private patchEdited(id: string, patch: Partial<EditedValue>): void {
     this.editedValues.update((m) => {
       const v = m.get(id);
@@ -426,7 +735,13 @@ export class BlockEditComponent implements AfterViewInit {
   flushExisting(id: string): void {
     const v = this.editedFor(id);
     if (!v.tag) return; // Skip empty saves
-    this.save.emit({ id, tag: v.tag, description: v.description, is_done: v.is_done });
+    this.save.emit({
+      id,
+      tag: v.tag,
+      description: v.description,
+      is_done: v.is_done,
+      difficulty: v.difficulty,
+    });
   }
 
   onDelete(id: string): void {
@@ -444,7 +759,12 @@ export class BlockEditComponent implements AfterViewInit {
   }
 
   updateNewDone(is_done: boolean): void {
+    this.newDoneEdited = true;
     this.newValue.update((v) => ({ ...v, is_done }));
+  }
+
+  updateNewDifficulty(delta: number): void {
+    this.newValue.update((v) => ({ ...v, difficulty: clampDifficulty(v.difficulty + delta) }));
   }
 
   submitNew(): void {
@@ -455,6 +775,7 @@ export class BlockEditComponent implements AfterViewInit {
       tag: v.tag,
       description: v.description,
       is_done: v.is_done,
+      difficulty: v.difficulty,
     });
     this.close.emit();
   }
