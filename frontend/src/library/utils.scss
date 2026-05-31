@@ -6,4 +6,22 @@
       margin-bottom: $spacing;
     }
   }
+
+  & > lt-modal {
+    @if $horizontal {
+      margin-right: 0 !important;
+    } @else {
+      margin-bottom: 0 !important;
+    }
+  }
+
+  // Fixed modal hosts should not make the previous content child count as
+  // "not last" for spacing.
+  & > *:not(:last-child):not(lt-modal):not(:has(~ *:not(lt-modal))) {
+    @if $horizontal {
+      margin-right: 0;
+    } @else {
+      margin-bottom: 0;
+    }
+  }
 }

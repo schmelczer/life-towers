@@ -38,6 +38,10 @@ input[type='text'] {
   &:focus {
     box-shadow: 0 1px $text-color;
   }
+
+  &:focus-visible {
+    box-shadow: 0 2px $text-color;
+  }
 }
 
 button {
@@ -55,6 +59,19 @@ button {
   cursor: pointer;
   border-bottom: solid $height #5d576b55;
   position: relative;
+
+  // Mobile: grow buttons to a ~42px tap target, but pin the label to the bottom
+  // so the bottom-border underline keeps hugging it (as on desktop). A bare
+  // min-height vertically centres the text and strands the underline well below
+  // it. Using flex (not a hit-area pseudo-element) means buttons that `all: unset`
+  // their styling — .tickbox, .swatch, .edit-tower — reset these props and opt out
+  // automatically, instead of inheriting a stray absolute overlay.
+  @media (max-width: $mobile-width) {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
 
   &:disabled {
     color: #5d576b55;
