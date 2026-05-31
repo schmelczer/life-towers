@@ -10,7 +10,11 @@
 
 <div class="page-container">
   @if (selectedPage(); as page) {
-    <lt-page [page]="page" (dragHappening)="dragHappening.set($event)" />
+    <lt-page
+      [page]="page"
+      [animateInitialStack]="page.id === animateInitialStackPageId()"
+      (dragHappening)="dragHappening.set($event)"
+    />
   } @else {
     <p>Add a new page to get started!</p>
   }
@@ -27,14 +31,37 @@
       [page]="selectedPage()"
       (close)="showSettings.set(false)"
       (updatePage)="onUpdatePage($event)"
-      (deletePage)="onRemovePage()"
+      (deletePage)="onRequestRemovePage()"
       (switchAccount)="onSwitchAccount($event)"
     />
   </lt-modal>
 }
 
+@if (confirmDeletePageId()) {
+  <lt-modal (close)="cancelRemovePage()">
+    <div class="confirm-delete">
+      <div class="header">
+        <button class="exit" type="button" (click)="cancelRemovePage()" aria-label="Cancel"></button>
+        <h2>Delete page</h2>
+      </div>
+      <p>
+        Delete <strong>{{ confirmDeletePageName() || 'this page' }}</strong> and all of its towers and blocks?
+        This can't be undone.
+      </p>
+      <div class="confirm-buttons">
+        <button type="button" (click)="cancelRemovePage()">Cancel</button>
+        <button type="button" class="danger" (click)="confirmRemovePage()">Delete page</button>
+      </div>
+    </div>
+  </lt-modal>
+}
+
 @if (showWelcome()) {
-  <lt-modal (close)="showWelcome.set(false)">
+  <lt-modal
+    labelledBy="welcome-title"
+    describedBy="welcome-description"
+    (close)="showWelcome.set(false)"
+  >
     <lt-welcome
       (close)="showWelcome.set(false)"
       (startFresh)="showWelcome.set(false)"

@@ -5,6 +5,7 @@ import {
   signal,
   computed,
   effect,
+  OnDestroy,
 } from '@angular/core';
 import { StoreService } from '../../services/store.service';
 import { PageComponent } from '../page/page.component';
@@ -22,7 +23,7 @@ import { Page } from '../../models';
   templateUrl: './pages.component.html',
   styleUrl: './pages.component.scss',
 })
-export class PagesComponent {
+export class PagesComponent implements OnDestroy {
   protected readonly store = inject(StoreService);
 
   /** ID of currently selected page within store.pages(). */
@@ -31,20 +32,41 @@ export class PagesComponent {
   readonly showSettings = signal(false);
   readonly dragHappening = signal(false);
   readonly showWelcome = signal(false);
+  readonly confirmDeletePageId = signal<string | null>(null);
+  readonly animateInitialStackPageId = signal<string | null>(null);
+  private exampleAnimationTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     effect(() => {
-      if (!this.store.loading() && this.store.pages().length === 0) {
+      const pages = this.store.pages();
+      if (!this.store.loading() && pages.length === 0) {
         this.showWelcome.set(true);
-      } else if (this.store.pages().length > 0) {
+      } else if (pages.length > 0) {
         this.showWelcome.set(false);
       }
     });
   }
 
   onLoadExample(): void {
-    this.store.loadExample();
+    const pageId = this.store.loadExample();
+    this.selectedPageId.set(pageId);
+    this.animateInitialStackPageId.set(pageId);
+    if (this.exampleAnimationTimer !== null) {
+      clearTimeout(this.exampleAnimationTimer);
+    }
+    this.exampleAnimationTimer = setTimeout(() => {
+      if (this.animateInitialStackPageId() === pageId) {
+        this.animateInitialStackPageId.set(null);
+      }
+      this.exampleAnimationTimer = null;
+    }, 2500);
     this.showWelcome.set(false);
+  }
+
+  ngOnDestroy(): void {
+    if (this.exampleAnimationTimer !== null) {
+      clearTimeout(this.exampleAnimationTimer);
+    }
   }
 
   readonly pageNames = computed(() => this.store.pages().map((p) => p.name));
@@ -61,12 +83,17 @@ export class PagesComponent {
     return pages[0] ?? null;
   });
 
-  readonly selectedPageName = computed(() => this.selectedPage()?.name ?? null);
+  readonly confirmDeletePageName = computed(() => {
+    const id = this.confirmDeletePageId();
+    if (!id) return '';
+    return this.store.pages().find((p) => p.id === id)?.name ?? '';
+  });
 
   readonly selectedPageIndex = computed(() => {
+    const pages = this.store.pages();
     const page = this.selectedPage();
     if (!page) return -1;
-    return this.store.pages().findIndex((p) => p.id === page.id);
+    return pages.findIndex((p) => p.id === page.id);
   });
 
   onSelectPage(index: number): void {
@@ -94,12 +121,23 @@ export class PagesComponent {
     }
   }
 
-  onRemovePage(): void {
+  onRequestRemovePage(): void {
     const page = this.selectedPage();
     if (!page) return;
-    this.store.deletePage(page.id);
+    this.confirmDeletePageId.set(page.id);
+  }
+
+  confirmRemovePage(): void {
+    const pageId = this.confirmDeletePageId();
+    if (!pageId) return;
+    this.store.deletePage(pageId);
     this.selectedPageId.set(null);
     this.showSettings.set(false);
+    this.confirmDeletePageId.set(null);
+  }
+
+  cancelRemovePage(): void {
+    this.confirmDeletePageId.set(null);
   }
 
   onSwitchAccount(token: string): void {

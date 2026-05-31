@@ -7,10 +7,11 @@
   @for (tower of page().towers; track tower.id) {
     <lt-tower
       cdkDrag
-      [cdkDragDisabled]="modalOpen()"
+      [cdkDragDisabled]="modalOpen() || mobileDragDisabled()"
       [tower]="tower"
       [dateRange]="dateRange()"
       [keepTasksOpen]="page().keep_tasks_open"
+      [animateInitialStack]="animateInitialStack()"
       (cdkDragStarted)="onTowerDragStart(tower.id)"
       (updateTower)="onUpdateTower(tower.id, $event)"
       (deleteTowerRequest)="onDeleteTower(tower.id)"
@@ -21,7 +22,16 @@
   }
   @if (!page().hide_create_tower_button) {
     <div class="add-tower-wrapper">
-      <img class="add-tower" src="assets/plus-sign.svg" alt="Add tower" (click)="showAddTower.set(true)" />
+      <img
+        class="add-tower"
+        src="assets/plus-sign.svg"
+        alt="Add tower"
+        role="button"
+        tabindex="0"
+        (click)="showAddTower.set(true)"
+        (keydown.enter)="showAddTower.set(true)"
+        (keydown.space)="$event.preventDefault(); showAddTower.set(true)"
+      />
     </div>
   }
 </section>
@@ -48,7 +58,7 @@
 
 @if (showAddTower()) {
   <lt-modal title="New Tower" (close)="showAddTower.set(false)">
-    <lt-tower-settings [tower]="null" (save)="onAddTower($event)" />
+    <lt-tower-settings [tower]="null" (save)="onAddTower($event)" (close)="showAddTower.set(false)" />
   </lt-modal>
 }
 
@@ -56,7 +66,7 @@
   <lt-modal (close)="cancelTowerDelete()">
     <div class="confirm-delete">
       <div class="header">
-        <div class="exit" (click)="cancelTowerDelete()" role="button" aria-label="Cancel"></div>
+        <button class="exit" type="button" (click)="cancelTowerDelete()" aria-label="Cancel"></button>
         <h2>Delete tower</h2>
       </div>
       <p>Delete <strong>{{ confirmDeleteTowerName() || 'this tower' }}</strong> and all of its blocks? This can't be undone.</p>

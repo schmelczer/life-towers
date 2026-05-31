@@ -1,7 +1,8 @@
-@import '../../../styles';
+@import '../../../library/main';
 
 :host {
   height: 100%;
+  min-height: 0;
 
   display: flex;
   flex-direction: column;
@@ -11,14 +12,24 @@
 
   .select-add-container {
     width: 250px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
     position: relative;
     z-index: 1000;
+    @media (max-width: $mobile-width) {
+      width: 80vw;
+      max-width: 320px;
+    }
   }
 
   .page-container {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    // Generous breathing room between the page selector dropdown and the
+    // towers — the dropdown can open downward without crowding the towers.
+    padding-top: var(--large-padding);
+    @media (max-width: $mobile-width) {
+      padding-top: var(--medium-padding);
+    }
   }
 
   button {
@@ -26,6 +37,66 @@
 
     &.transparent {
       opacity: 0;
+    }
+
+    @media (max-width: $mobile-width) {
+      margin-top: var(--medium-padding);
+      font-size: var(--medium-font-size);
+    }
+  }
+
+  .confirm-delete {
+    @include card();
+    width: 66vw;
+    max-width: 500px;
+    @media (max-width: $mobile-width) {
+      width: 88vw;
+      max-width: 88vw;
+      padding: var(--medium-padding);
+    }
+    box-sizing: border-box;
+    padding: var(--large-padding);
+    position: relative;
+    box-shadow: $shadow;
+    @include inner-spacing(var(--large-padding));
+    text-align: center;
+
+    .header {
+      @include center-child();
+
+      .exit {
+        position: absolute;
+        right: var(--large-padding);
+        @include exit();
+      }
+    }
+
+    .confirm-buttons {
+      display: flex;
+      justify-content: center;
+      gap: var(--large-padding);
+
+      button {
+        max-width: 100%;
+      }
+
+      button.danger {
+        color: #b53f3f;
+        border-bottom-color: #b53f3f55;
+
+        &:after {
+          background-color: #b53f3f;
+        }
+      }
+
+      @media (max-width: $mobile-width) {
+        flex-direction: column;
+        gap: var(--small-padding);
+
+        button {
+          width: 100%;
+        }
+      }
     }
   }
 }

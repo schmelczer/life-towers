@@ -1,10 +1,11 @@
-@import '../../../styles';
+@import '../../../library/main';
 
 :host {
   display: flex;
   flex-direction: column;
 
   height: 100%;
+  min-height: 0;
   position: relative; // anchor for absolute-positioned .trash
 
   @include inner-spacing(var(--large-padding));
@@ -18,14 +19,17 @@
     justify-content: center;
 
     width: 100%;
+    box-sizing: border-box;
     margin-left: auto;
     margin-right: auto;
 
-    flex: 1 0 auto;
+    flex: 1 1 auto;
+    min-height: 0;
 
     transition: box-shadow $short-animation-time;
 
-    max-width: 800px;
+    max-width: 100%;
+    gap: var(--medium-padding);
 
     &.cdk-drop-list-dragging {
       *:not(.cdk-drag-placeholder) {
@@ -52,28 +56,45 @@
     }
 
     & > * {
+      width: 100%;
       max-width: 200px;
-      box-sizing: content-box;
-      flex: 0 0 auto;
-
-      &:not(:nth-last-child(1)) {
-        margin-right: var(--medium-padding);
-        @media (max-width: $mobile-width) {
-          margin-right: var(--small-padding);
-        }
-      }
+      box-sizing: border-box;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
     }
 
     position: relative;
 
-    @for $i from 1 to 12 {
-      & > *:first-child:nth-last-child(#{$i}),
-      & > *:first-child:nth-last-child(#{$i}) ~ * {
-        width: calc((100% - (#{$i} - 1) * var(--medium-padding)) / #{$i});
+    // Mobile: fixed-width towers with horizontal scroll (1.5-column rhythm).
+    @media (max-width: $mobile-width) {
+      --mobile-tower-width: calc(66vw - var(--small-padding));
+      --mobile-tower-side-padding: max(
+        var(--medium-padding),
+        calc((100% - var(--mobile-tower-width)) / 2)
+      );
 
-        @media (max-width: $mobile-width) {
-          width: calc((100% - (#{$i} - 1) * var(--small-padding)) / #{$i});
-        }
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: var(--mobile-tower-side-padding);
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      padding: 0 var(--mobile-tower-side-padding);
+      max-width: 100%;
+      gap: var(--medium-padding);
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+
+      & > * {
+        width: var(--mobile-tower-width) !important;
+        max-width: var(--mobile-tower-width) !important;
+        min-width: var(--mobile-tower-width) !important;
+        scroll-snap-align: center;
+        flex: 0 0 var(--mobile-tower-width);
       }
     }
   }
@@ -89,7 +110,11 @@
     @include card();
     width: 66vw;
     max-width: 500px;
-    @media (max-width: $mobile-width) { width: 300px; }
+    @media (max-width: $mobile-width) {
+      width: 88vw;
+      max-width: 88vw;
+      padding: var(--medium-padding);
+    }
     box-sizing: border-box;
     padding: var(--large-padding);
     position: relative;
@@ -101,7 +126,7 @@
       @include center-child();
       .exit {
         position: absolute;
-        left: var(--large-padding);
+        right: var(--large-padding);
         @include exit();
       }
     }
@@ -115,10 +140,20 @@
       justify-content: center;
       gap: var(--large-padding);
 
+      button {
+        max-width: 100%;
+      }
+
       button.danger {
         color: #b53f3f;
         border-bottom-color: #b53f3f55;
         &:after { background-color: #b53f3f; }
+      }
+
+      @media (max-width: $mobile-width) {
+        flex-direction: column;
+        gap: var(--small-padding);
+        button { width: 100%; }
       }
     }
   }

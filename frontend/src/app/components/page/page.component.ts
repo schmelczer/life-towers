@@ -4,7 +4,11 @@ import {
   input,
   output,
   signal,
+  computed,
   inject,
+  HostListener,
+  effect,
+  untracked,
 } from '@angular/core';
 import { Page } from '../../models';
 import { StoreService } from '../../services/store.service';
@@ -15,7 +19,6 @@ import {
   DoubleSliderComponent,
   DoubleSliderRange,
 } from '../shared/double-slider/double-slider.component';
-import { computed } from '@angular/core';
 import { CdkDropList, CdkDrag, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ModalStateService } from '../../services/modal-state.service';
 
@@ -38,6 +41,7 @@ interface BlockPatch {
   tag: string;
   description: string;
   is_done: boolean;
+  difficulty: number;
 }
 
 /** Minimum blocks before the date-range slider becomes visible. */
@@ -60,12 +64,14 @@ const MIN_BLOCKS_FOR_SLIDER = 2;
 })
 export class PageComponent {
   readonly page = input.required<Page>();
+  readonly animateInitialStack = input<boolean>(false);
   readonly dragHappening = output<boolean>();
 
   protected readonly store = inject(StoreService);
   private readonly modalState = inject(ModalStateService);
   /** True while any lt-modal is mounted — used to lock tower drag. */
   readonly modalOpen = this.modalState.anyOpen;
+  readonly mobileDragDisabled = signal(this.isMobileViewport());
 
   readonly showAddTower = signal(false);
   readonly isDragging = signal(false);
@@ -112,8 +118,28 @@ export class PageComponent {
   /** Selected date range — `null` = show everything. */
   readonly dateRange = signal<{ from: number; to: number } | null>(null);
 
+  constructor() {
+    effect(() => {
+      if (!this.showSlider()) {
+        untracked(() => this.dateRange.set(null));
+      }
+    });
+  }
+
   onSliderRangeChange(range: DoubleSliderRange<unknown>): void {
     this.dateRange.set({ from: range.from as number, to: range.to as number });
+  }
+
+  @HostListener('window:resize')
+  onResize(): void {
+    this.mobileDragDisabled.set(this.isMobileViewport());
+  }
+
+  private isMobileViewport(): boolean {
+    return (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 520px), (pointer: coarse)').matches
+    );
   }
 
   // ── Tower mutations ────────────────────────────────────────────────────────
@@ -131,7 +157,7 @@ export class PageComponent {
   }
 
   onDeleteTower(towerId: string): void {
-    this.store.deleteTower(this.page().id, towerId);
+    this.confirmDeleteTowerId.set(towerId);
   }
 
   // ── Block mutations ────────────────────────────────────────────────────────
@@ -143,6 +169,7 @@ export class PageComponent {
       result.tag,
       result.description,
       result.is_done,
+      result.difficulty,
     );
   }
 
@@ -187,13 +214,16 @@ export class PageComponent {
 
   onTrashEnter(): void {
     this.nearTrashcan = true;
-    const preview = document.querySelector('.cdk-drag-preview');
-    if (preview) preview.classList.add('trash-highlight');
+    this.dragPreview()?.classList.add('trash-highlight');
   }
 
   onTrashLeave(): void {
     this.nearTrashcan = false;
-    const preview = document.querySelector('.cdk-drag-preview');
-    if (preview) preview.classList.remove('trash-highlight');
+    this.dragPreview()?.classList.remove('trash-highlight');
+  }
+
+  /** The CDK drag preview currently in flight, if any. Matches legacy DOM-driven trash highlight. */
+  private dragPreview(): Element | null {
+    return document.querySelector('.cdk-drag-preview');
   }
 }
