@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, OnInit, inject } from '@angular/core';
 import { StoreService } from './services/store.service';
+import { AnalyticsService } from './services/analytics.service';
 import { PagesComponent } from './components/pages/pages.component';
 
 @Component({
@@ -11,8 +12,10 @@ import { PagesComponent } from './components/pages/pages.component';
 })
 export class App implements OnInit {
   private readonly store = inject(StoreService);
+  private readonly analytics = inject(AnalyticsService);
 
   ngOnInit(): void {
-    this.store.init();
+    this.analytics.init();
+    void this.store.init();
   }
 }
