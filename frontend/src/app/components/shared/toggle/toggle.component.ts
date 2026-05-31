@@ -11,7 +11,14 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="toggle">
-      <span [class.active]="!checked()" (click)="set(false)">{{ offLabel() }}</span>
+      <span
+        role="button"
+        tabindex="0"
+        [class.active]="!checked()"
+        (click)="set(false)"
+        (keydown.enter)="set(false)"
+        (keydown.space)="$event.preventDefault(); set(false)"
+      >{{ offLabel() }}</span>
       <label>
         <input
           type="checkbox"
@@ -20,7 +27,14 @@ import {
           (change)="set(!checked())"
         />
       </label>
-      <span [class.active]="checked()" (click)="set(true)">{{ onLabel() }}</span>
+      <span
+        role="button"
+        tabindex="0"
+        [class.active]="checked()"
+        (click)="set(true)"
+        (keydown.enter)="set(true)"
+        (keydown.space)="$event.preventDefault(); set(true)"
+      >{{ onLabel() }}</span>
     </div>
   `,
   styles: `
@@ -30,7 +44,12 @@ import {
       $size: 30px;
 
       @include center-child();
-      @include inner-spacing(var(--medium-padding), $horizontal: true);
+      gap: var(--medium-padding);
+
+      @media (max-width: $mobile-width) {
+        width: 100%;
+        gap: var(--small-padding);
+      }
 
       .toggle {
         display: contents;
@@ -41,7 +60,7 @@ import {
         // Fixed width (not max-width) so multiple toggles align column-wise
         // — the thumb position is identical across rows regardless of label.
         flex: 0 0 auto;
-        width: 4 * $size;
+        width: var(--toggle-label-width, #{4 * $size});
         box-sizing: border-box;
         padding: 0 var(--small-padding);
         line-height: 1.3;
@@ -50,10 +69,19 @@ import {
         &.active { font-weight: bold; }
         &:first-of-type { text-align: right; }
         &:last-of-type  { text-align: left; }
+
+        @media (max-width: $mobile-width) {
+          flex: 1 1 0;
+          width: auto;
+          min-width: 0;
+          padding: 0;
+          overflow-wrap: anywhere;
+        }
       }
 
       label {
         display: block;
+        flex: 0 0 auto;
 
         input[type='checkbox'] {
           -webkit-appearance: none;
