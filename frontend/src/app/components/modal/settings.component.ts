@@ -16,9 +16,6 @@ export interface UpdatePagePayload {
   keep_tasks_open: boolean;
 }
 
-const UUIDV4_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 @Component({
   selector: 'lt-settings',
   standalone: true,
@@ -26,7 +23,7 @@ const UUIDV4_RE =
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="card">
-      <button class="exit" type="button" (click)="close.emit()" aria-label="Close">✕</button>
+      <button class="exit" type="button" (click)="close.emit()" aria-label="Close"></button>
       <h2>Settings</h2>
 
       @if (page()) {
@@ -36,26 +33,30 @@ const UUIDV4_RE =
           <input
             type="text"
             [value]="pageName()"
-            (blur)="onRenamePage($any($event.target).value)"
+            (blur)="onRenamePage($any($event.target))"
             placeholder="Page name…"
             maxlength="200"
             autocomplete="off"
             aria-label="Page name"
           />
 
-          <lt-toggle
-            [checked]="hideCreateTowerButton()"
-            (checkedChange)="onHideCreateTowerButtonChange($event)"
-            offLabel="Show add-tower button"
-            onLabel="Hide add-tower button"
-          />
+          <div class="toggle-list">
+            <lt-toggle
+              class="setting-toggle"
+              [checked]="hideCreateTowerButton()"
+              (checkedChange)="onHideCreateTowerButtonChange($event)"
+              offLabel="Show add-tower button"
+              onLabel="Hide add-tower button"
+            />
 
-          <lt-toggle
-            [checked]="keepTasksOpen()"
-            (checkedChange)="onKeepTasksOpenChange($event)"
-            offLabel="Show tasks collapsed"
-            onLabel="Keep tasks open"
-          />
+            <lt-toggle
+              class="setting-toggle"
+              [checked]="keepTasksOpen()"
+              (checkedChange)="onKeepTasksOpenChange($event)"
+              offLabel="Show tasks collapsed"
+              onLabel="Keep tasks open"
+            />
+          </div>
 
           <button class="danger" type="button" (click)="deletePage.emit()">
             Delete this page
@@ -68,7 +69,7 @@ const UUIDV4_RE =
       <section class="account-section">
         <h3>Account</h3>
 
-        <p class="hint">Your token (keep it secret — it IS your account)</p>
+        <p class="hint">Copy this token to another device to permanently sync your progress</p>
         <div class="token-row">
           <input
             type="text"
@@ -111,7 +112,11 @@ const UUIDV4_RE =
       @include card();
       width: 66vw;
       max-width: 480px;
-      @media (max-width: $mobile-width) { width: 300px; }
+      @media (max-width: $mobile-width) {
+        width: 88vw;
+        max-width: 88vw;
+        padding: var(--medium-padding);
+      }
       box-sizing: border-box;
       padding: var(--large-padding);
       position: relative;
@@ -123,17 +128,19 @@ const UUIDV4_RE =
         top: var(--medium-padding);
         right: var(--medium-padding);
         @include exit();
-        font-size: 0;
       }
 
       h2 {
         margin: 0 0 var(--large-padding) 0;
+        padding: 0 36px;
+        line-height: 1.3;
         text-align: center;
       }
 
       h3 {
         margin: 0 0 var(--medium-padding) 0;
-        font-size: var(--large-font-size);
+        font-size: var(--medium-font-size);
+        line-height: 1.35;
       }
 
       section {
@@ -151,8 +158,37 @@ const UUIDV4_RE =
         margin: var(--large-padding) 0;
       }
 
+      input[type='text'],
+      button:not(.exit) {
+        font-size: var(--medium-font-size);
+        line-height: 1.35;
+      }
+
+      .toggle-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--small-padding);
+      }
+
+      lt-toggle.setting-toggle {
+        --toggle-label-width: 145px;
+
+        box-sizing: border-box;
+        justify-content: center;
+        width: 100%;
+        min-height: 52px;
+        padding: var(--small-padding);
+        border-radius: var(--border-radius);
+        background: rgba($text-color, 0.035);
+
+        @media (max-width: $mobile-width) {
+          min-height: 48px;
+        }
+      }
+
       .hint {
-        font-size: var(--small-font-size);
+        font-size: var(--medium-font-size);
+        line-height: 1.35;
         color: rgba($text-color, 0.7);
         margin: 0 0 4px 0;
       }
@@ -171,6 +207,13 @@ const UUIDV4_RE =
         button {
           margin: 0;
           flex: 0 0 auto;
+          max-width: 100%;
+        }
+
+        @media (max-width: $mobile-width) {
+          flex-wrap: wrap;
+          input { width: 100%; }
+          button { margin-left: auto; }
         }
       }
 
@@ -209,10 +252,15 @@ export class SettingsComponent {
   readonly hideCreateTowerButton = signal(false);
   readonly keepTasksOpen = signal(false);
 
+  private static readonly UUIDV4_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   // Token-switch state
   readonly tokenInput = signal('');
   readonly tokenInputTouched = signal(false);
-  readonly isValidToken = computed(() => UUIDV4_RE.test(this.tokenInput()));
+  readonly isValidToken = computed(() =>
+    SettingsComponent.UUIDV4_RE.test(this.tokenInput()),
+  );
 
   constructor() {
     effect(() => {
@@ -225,10 +273,14 @@ export class SettingsComponent {
     });
   }
 
-  onRenamePage(value: string): void {
-    const trimmed = value.trim();
-    if (!trimmed) return;
+  onRenamePage(input: HTMLInputElement): void {
+    const trimmed = input.value.trim();
+    if (!trimmed) {
+      input.value = this.pageName();
+      return;
+    }
     this.pageName.set(trimmed);
+    input.value = trimmed;
     this.flushPageUpdate();
   }
 

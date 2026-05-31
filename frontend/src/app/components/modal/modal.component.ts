@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   output,
+  input,
   signal,
   AfterViewInit,
   OnDestroy,
@@ -22,8 +23,20 @@ import { ModalStateService } from '../../services/modal-state.service';
       class="modal"
       [class.active]="active()"
       (click)="onBackdropClick($event)"
+      (keydown.enter)="onBackdropClick($any($event))"
+      tabindex="-1"
     >
-      <div class="modal__dialog" #dialog cdkTrapFocus cdkTrapFocusAutoCapture (keydown.escape)="onClose()">
+      <div
+        class="modal__dialog"
+        #dialog
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-labelledby]="labelledBy()"
+        [attr.aria-describedby]="describedBy()"
+        cdkTrapFocus
+        cdkTrapFocusAutoCapture
+        (keydown.escape)="onClose()"
+      >
         <ng-content></ng-content>
       </div>
     </section>
@@ -31,19 +44,35 @@ import { ModalStateService } from '../../services/modal-state.service';
   styles: `
     @import '../../../library/main';
 
-    section.modal {
+    /* Keep the component host out of parent flex/grid flow. Parent containers
+       apply spacing to direct children, so relying on the fixed child alone can
+       still let <lt-modal> become a layout item when it mounts. */
+    :host {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      inset: 0;
       z-index: 10000;
+      display: block;
+      margin: 0 !important;
+    }
+
+    section.modal {
+      position: absolute;
+      inset: 0;
       @include center-child();
       padding: var(--large-padding);
       box-sizing: border-box;
-      background: $background-gradient;
+      background: rgba(255, 248, 248, 0.94);
       transition: opacity 300ms;
       opacity: 1;
+      overflow-y: auto;
+
+      @media (max-width: $mobile-width) {
+        padding: var(--medium-padding);
+      }
+
+      @media (max-height: $min-height) {
+        align-items: flex-start;
+      }
 
       &:not(.active) {
         opacity: 0;
@@ -57,6 +86,8 @@ import { ModalStateService } from '../../services/modal-state.service';
   `,
 })
 export class ModalComponent implements AfterViewInit, OnDestroy {
+  readonly labelledBy = input<string | null>(null);
+  readonly describedBy = input<string | null>(null);
   readonly close = output<void>();
 
   // The active signal starts false; AfterViewInit flips it true on next tick
@@ -65,7 +96,6 @@ export class ModalComponent implements AfterViewInit, OnDestroy {
 
   private readonly dialogRef = viewChild<ElementRef<HTMLElement>>('dialog');
   private previousFocus: HTMLElement | null = null;
-  private escListener!: (e: KeyboardEvent) => void;
   private readonly modalState = inject(ModalStateService);
 
   ngAfterViewInit(): void {
