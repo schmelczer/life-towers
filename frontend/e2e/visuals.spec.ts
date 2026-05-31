@@ -1,5 +1,10 @@
 import { test } from '@playwright/test';
 
+test.skip(
+  process.env['CAPTURE_VISUALS'] !== '1',
+  'Set CAPTURE_VISUALS=1 to run the visual screenshot capture suite.',
+);
+
 /**
  * Visual capture: drives the UI into key states and writes screenshots
  * for human review of the legacy-styled design.
@@ -7,8 +12,15 @@ import { test } from '@playwright/test';
 test.describe('Life Towers visuals', () => {
   test('capture key UI states', async ({ page }) => {
     await page.goto('/');
-    await page.waitForSelector('text=Add a new page to get started!', { timeout: 15000 });
-    await page.screenshot({ path: 'visuals/01-empty-state.png', fullPage: true });
+    await page.waitForSelector('text=Welcome to Life Towers', { timeout: 15000 });
+    await page.waitForTimeout(350); // let the welcome modal finish fade-in
+    await page.screenshot({ path: 'visuals/01-welcome-modal.png', fullPage: true });
+
+    // Dismiss the welcome modal with Start empty, then continue.
+    await page.getByRole('button', { name: 'Start empty' }).click();
+    await page.waitForSelector('section.modal', { state: 'detached' });
+
+    await page.screenshot({ path: 'visuals/01b-empty-state-after-dismiss.png', fullPage: true });
 
     // Open the page dropdown (without creating a page yet).
     await page.locator('lt-select-add .top').first().click();
@@ -26,7 +38,7 @@ test.describe('Life Towers visuals', () => {
     await page.locator('img[alt="Add tower"]').click();
     await page.waitForSelector('section.modal.active');
     await page.waitForTimeout(350);
-    await page.locator('input[placeholder="Tower name…"]').fill('Reading');
+    await page.locator('input[placeholder="New tower"]').fill('Reading');
     await page.screenshot({ path: 'visuals/03-new-tower-modal.png', fullPage: true });
     await page.locator('lt-tower-settings button[type="submit"]').click();
     await page.waitForSelector('section.modal', { state: 'detached' });
@@ -46,19 +58,25 @@ test.describe('Life Towers visuals', () => {
     await createCard
       .locator('textarea[placeholder="Write a description here…"]')
       .fill('Finish The Brothers Karamazov');
-    // Toggle to "Task hasn't been finished yet" so this becomes a pending task.
-    await createCard
-      .locator('lt-toggle span')
-      .filter({ hasText: "This task hasn't been finished yet" })
-      .click();
-    await page.getByRole('button', { name: 'Create and exit' }).click();
+    // Uncheck "Already done" so this becomes a pending task.
+    await createCard.getByLabel('Already done').uncheck();
+    await page.getByRole('button', { name: 'Create and exit', exact: true }).click();
     await page.waitForSelector('section.modal', { state: 'detached' });
 
     // Open the tasks accordion to show the new tickbox.
     await page.waitForTimeout(200);
-    await page.locator('lt-tasks .container').click();
+    await page.locator('lt-tasks .header').click();
     await page.waitForTimeout(300);
     await page.screenshot({ path: 'visuals/04b-tasks-accordion-with-tickbox.png', fullPage: true });
+
+    // Hover the tickbox: must NOT pop a scrollbar in the accordion, must NOT
+    // paint the global button-underline bar across the top, and the ✓ must stay
+    // centred (regression guard — see tasks.component .tickbox::after).
+    await page.locator('lt-tasks .tickbox').first().hover();
+    await page.waitForTimeout(350);
+    await page.locator('lt-tasks .container').screenshot({
+      path: 'visuals/04c-tasks-tickbox-hover.png',
+    });
 
     // Add a couple more blocks.
     for (const desc of ['Read about WebAssembly GC', 'Re-read "Out of the Tar Pit"']) {
@@ -70,7 +88,7 @@ test.describe('Life Towers visuals', () => {
       await cc.locator('lt-select-add .top').click();
       await page.waitForTimeout(100);
       await cc.locator('textarea[placeholder="Write a description here…"]').fill(desc);
-      await page.getByRole('button', { name: 'Create and exit' }).click();
+      await page.getByRole('button', { name: 'Create and exit', exact: true }).click();
       await page.waitForSelector('section.modal', { state: 'detached' });
     }
 
@@ -100,7 +118,7 @@ test.describe('Life Towers visuals', () => {
     await page.locator('img[alt="Add tower"]').click();
     await page.waitForSelector('section.modal.active');
     await page.waitForTimeout(350);
-    await page.locator('input[placeholder="Tower name…"]').fill('Side projects');
+    await page.locator('input[placeholder="New tower"]').fill('Side projects');
     await page.locator('lt-tower-settings button[type="submit"]').click();
     await page.waitForSelector('section.modal', { state: 'detached' });
     await page.waitForTimeout(300);
@@ -156,5 +174,40 @@ test.describe('Life Towers visuals', () => {
     await page.waitForSelector('section.modal.active');
     await page.waitForTimeout(350);
     await page.screenshot({ path: 'visuals/11-settings-modal.png', fullPage: true });
+  });
+
+  test('"Load sample towers" populates a sample page', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('text=Welcome to Life Towers', { timeout: 15000 });
+    await page.waitForTimeout(350);
+    await page.getByRole('button', { name: 'Load sample towers' }).click();
+    await page.waitForSelector('section.modal', { state: 'detached' });
+    await page.waitForTimeout(1800);
+    await page.screenshot({ path: 'visuals/12-example-data.png', fullPage: true });
+  });
+
+  test('Mobile viewport — welcome + example + carousel', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+
+    await page.goto((process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:8000') + '/');
+    await page.waitForSelector('text=Welcome to Life Towers', { timeout: 15000 });
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: 'visuals/13-mobile-welcome.png', fullPage: true });
+
+    await page.getByRole('button', { name: 'Load sample towers' }).click();
+    await page.waitForSelector('section.modal', { state: 'detached' });
+    await page.waitForTimeout(1800);
+    await page.screenshot({ path: 'visuals/14-mobile-populated.png', fullPage: true });
+
+    // Open the block-edit carousel for the first tower's first task.
+    await page.locator('lt-tasks .header').first().click();
+    await page.waitForTimeout(400);
+    await page.locator('lt-tasks .task-description').first().click();
+    await page.waitForSelector('section.modal.active');
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: 'visuals/15-mobile-carousel.png', fullPage: true });
+
+    await ctx.close();
   });
 });
