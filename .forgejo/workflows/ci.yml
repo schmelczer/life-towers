@@ -9,7 +9,7 @@ on:
 jobs:
   backend:
     name: Backend tests
-    runs-on: ubuntu-latest
+    runs-on: docker
     defaults:
       run:
         working-directory: backend
@@ -32,7 +32,7 @@ jobs:
 
   frontend-lint:
     name: Frontend lint
-    runs-on: ubuntu-latest
+    runs-on: docker
     defaults:
       run:
         working-directory: frontend
@@ -53,7 +53,7 @@ jobs:
 
   frontend-test:
     name: Frontend unit tests
-    runs-on: ubuntu-latest
+    runs-on: docker
     defaults:
       run:
         working-directory: frontend
@@ -74,7 +74,7 @@ jobs:
 
   frontend-build:
     name: Frontend build
-    runs-on: ubuntu-latest
+    runs-on: docker
     defaults:
       run:
         working-directory: frontend
@@ -95,7 +95,7 @@ jobs:
 
   e2e:
     name: Playwright e2e
-    runs-on: ubuntu-latest
+    runs-on: docker
     needs: [backend, frontend-build]
     steps:
       - uses: actions/checkout@v4
