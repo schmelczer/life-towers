@@ -44,6 +44,7 @@ USER appuser
 
 ENV LIFE_TOWERS_DB_PATH=/data/life-towers.db \
     LIFE_TOWERS_STATIC_DIR=/app/static \
+    LIFE_TOWERS_FORWARDED_ALLOW_IPS=* \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
     PATH=/app/.venv/bin:$PATH
@@ -53,4 +54,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/v1/health || exit 1
 
-CMD ["uvicorn", "life_towers.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
+CMD ["sh", "-c", "uvicorn life_towers.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=${LIFE_TOWERS_FORWARDED_ALLOW_IPS}"]
