@@ -58,8 +58,27 @@ docker-compose.dev.yml   # Ephemeral volume for Playwright runs
 
 - **Frontend**: Angular 21+, **standalone components** (no NgModule), `signal()` / `computed()` / `effect()` / `linkedSignal()`, **zoneless change detection** (`provideZonelessChangeDetection`), `@if`/`@for` control flow, **OnPush** everywhere, esbuild builder (`@angular/build:application`), Reactive Forms, Angular Service Worker (PWA), Angular CDK (drag-drop, A11yModule for focus trap)
 - **Backend**: FastAPI, pydantic v2, slowapi (rate limiting), structlog, **sqlite3 with WAL + foreign_keys ON** every connection, uv-managed deps
-- **Runtime topology**: single Docker container — FastAPI process serves both `/api/v1/*` JSON endpoints AND the built Angular SPA as static files with SPA fallback. Behind nginx; uvicorn launched with `--proxy-headers --forwarded-allow-ips=*`
+- **Runtime topology**: single Docker container — FastAPI process serves both `/api/v1/*` JSON endpoints AND the built Angular SPA as static files with SPA fallback. Behind nginx; uvicorn launched with `--proxy-headers --forwarded-allow-ips=*`. **Deployed under a sub-path** (`https://schmelczer.dev/towers/`) — see "Sub-path deployment" below
 - **Storage**: SQLite at `/data/life-towers.db` on a named Docker volume. Tree-replace semantics (PUT replaces user's full tree atomically inside `BEGIN IMMEDIATE`)
+
+## Sub-path deployment
+
+The app is deployed under a path: `https://schmelczer.dev/towers/`. The mechanism, and the one rule that keeps it working:
+
+- **SPA**: built with `ng build --base-href /towers/` (wired via the `BASE_HREF` Docker build arg; default `/`, set to `/towers/` in `.forgejo/workflows/docker.yml`). This stamps `<base href="/towers/">` into `index.html` and prefixes every URL in the service-worker manifest (`ngsw.json`). Asset and script `src`s stay relative, so they resolve against `<base>`.
+- **API calls are relative** (`api/v1/...`, no leading slash — see `api.service.ts`) so they resolve against `<base>`: `/towers/api/v1/...` in prod, `/api/v1/...` at the root for dev/e2e. **Never reintroduce a leading slash** — it pins calls to the origin root and breaks the sub-path deploy.
+- **Backend is path-agnostic** — it still serves the API at `/api/v1/*` and the SPA at the container root. **nginx strips the prefix** before proxying, so the backend never sees `/towers`. Because of that strip, the backend can't infer its public URL, so `LIFE_TOWERS_PUBLIC_URL` (set in `docker-compose.yml`) is what makes the server-rendered canonical / OG / Twitter tags correct (`main.py:_absolute_meta_urls`).
+- **Required nginx** (the trailing slash on `proxy_pass` is what strips `/towers/`):
+  ```nginx
+  location = /towers { return 308 /towers/; }   # add the trailing slash
+  location /towers/ {
+      proxy_pass http://127.0.0.1:8000/;        # trailing slash strips the prefix
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+  ```
+- **Dev/e2e stay at the root**: `docker-compose.dev.yml` builds with the default `BASE_HREF=/`, and Playwright hits `http://life-towers:8000/`. The relative API paths work identically there, so e2e exercises the same code.
 
 ## Build / dev / test / deploy
 

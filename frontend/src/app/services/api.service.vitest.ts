@@ -24,7 +24,7 @@ describe('ApiService', () => {
   it('gets data with a bearer token', async () => {
     const tree: TreeDto = { pages: [] };
     const promise = service.getData('token-1');
-    const req = http.expectOne('/api/v1/data');
+    const req = http.expectOne('api/v1/data');
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Authorization')).toBe('Bearer token-1');
     req.flush(tree);
@@ -34,7 +34,7 @@ describe('ApiService', () => {
   it('puts data with a bearer token', async () => {
     const tree: TreeDto = { pages: [] };
     const promise = service.putData('token-1', tree);
-    const req = http.expectOne('/api/v1/data');
+    const req = http.expectOne('api/v1/data');
     expect(req.request.method).toBe('PUT');
     expect(req.request.headers.get('Authorization')).toBe('Bearer token-1');
     expect(req.request.body).toBe(tree);

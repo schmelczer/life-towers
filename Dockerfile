@@ -1,10 +1,16 @@
 # Stage 1: SPA build
 FROM node:22-alpine AS spa-build
 WORKDIR /build
+# Sub-path the SPA is served under, e.g. "/towers/" for https://schmelczer.dev/towers/.
+# Defaults to "/" so local/dev/e2e builds (served at the container root) work
+# unchanged. The production image (see .forgejo/workflows/docker.yml) overrides
+# this. The trailing slash matters — it becomes <base href> and the service
+# worker (ngsw.json) URL prefix.
+ARG BASE_HREF=/
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-RUN npm run build
+RUN npm run build -- --base-href="$BASE_HREF"
 # Angular's application builder outputs to dist/frontend/browser/
 
 # Stage 2: runtime

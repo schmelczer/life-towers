@@ -5,7 +5,13 @@ services:
     # or set it to e.g. `life-towers:local` and uncomment `build: .` for
     # local builds.
     image: ${LIFE_TOWERS_IMAGE:-life-towers:local}
-    # build: .  # uncomment for local builds (or use docker-compose.dev.yml)
+    # For a local production build, uncomment the block below. BASE_HREF must
+    # match the sub-path the app is served under (the published image is built
+    # with /towers/ by .forgejo/workflows/docker.yml).
+    # build:
+    #   context: .
+    #   args:
+    #     BASE_HREF: /towers/
     pull_policy: ${LIFE_TOWERS_PULL_POLICY:-missing}
     ports:
       - "${LIFE_TOWERS_PORT:-8000}:8000"
@@ -17,6 +23,11 @@ services:
       - life-towers-data:/data
     environment:
       LIFE_TOWERS_ALLOWED_ORIGIN: "${LIFE_TOWERS_ALLOWED_ORIGIN:-}"
+      # Absolute public URL of the deployment, used to render correct canonical
+      # / Open Graph / Twitter tags. Required when served under a sub-path,
+      # because nginx strips the prefix before proxying so the backend can't
+      # otherwise infer it. Override in .env for a different host/path.
+      LIFE_TOWERS_PUBLIC_URL: "${LIFE_TOWERS_PUBLIC_URL:-https://schmelczer.dev/towers/}"
     restart: unless-stopped
     logging:
       driver: json-file

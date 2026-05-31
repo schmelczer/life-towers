@@ -69,6 +69,11 @@ jobs:
         with:
           context: .
           push: true
+          # The published image is deployed at https://schmelczer.dev/towers/,
+          # so the SPA is built with that sub-path baked into <base href> and
+          # the service-worker manifest. Change this if the deploy path changes.
+          build-args: |
+            BASE_HREF=/towers/
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ steps.registry.outputs.image }}:buildcache
