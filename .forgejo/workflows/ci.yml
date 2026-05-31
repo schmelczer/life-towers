@@ -139,14 +139,29 @@ jobs:
 
       - name: Run Playwright
         run: |
-          docker run --rm \
+          set -eux
+          # Sibling-container (Docker-out-of-Docker) setup: the host daemon can't
+          # see this job's filesystem, so `-v "$(pwd)/frontend:/work"` would mount
+          # an empty dir. Instead create the container, copy the source IN, run,
+          # then copy artifacts back OUT — all via the CLI, which reads/writes the
+          # job container's filesystem.
+          cid=$(docker create \
             --network life-towers_default \
-            -v "$(pwd)/frontend:/work" \
-            -w /work \
             -e PLAYWRIGHT_BASE_URL=http://life-towers:8000 \
             -e CI=true \
             mcr.microsoft.com/playwright:v1.60.0-noble \
-            sh -c 'npm ci && npx playwright test'
+            sh -c 'cd /work && npm ci && npx playwright test')
+          # /work does not exist yet, so cp creates it from frontend's contents.
+          docker cp ./frontend "$cid":/work
+          # Run, but always copy artifacts back even when tests fail.
+          set +e
+          docker start -a "$cid"
+          code=$?
+          set -e
+          docker cp "$cid":/work/playwright-report ./frontend/ || true
+          docker cp "$cid":/work/visuals ./frontend/ || true
+          docker rm -f "$cid" >/dev/null 2>&1 || true
+          exit "$code"
 
       - name: Upload Playwright report
         if: always()
