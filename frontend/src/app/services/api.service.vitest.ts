@@ -1,28 +1,44 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ApiService } from './api.service';
+import type { TreeDto } from '../models';
 
-// Mock environment
-vi.mock('../../environments/environment', () => ({
-  environment: { apiBase: 'http://test-api', production: false },
-}));
+describe('ApiService', () => {
+  let service: ApiService;
+  let http: HttpTestingController;
 
-describe('ApiService URL patterns', () => {
-  const baseUrl = 'http://test-api';
-
-  it('constructs correct health URL', () => {
-    expect(`${baseUrl}/api/v1/health`).toBe('http://test-api/api/v1/health');
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), ApiService],
+    });
+    service = TestBed.inject(ApiService);
+    http = TestBed.inject(HttpTestingController);
   });
 
-  it('constructs correct register URL', () => {
-    expect(`${baseUrl}/api/v1/register`).toBe('http://test-api/api/v1/register');
+  afterEach(() => {
+    http.verify();
   });
 
-  it('constructs correct data URL', () => {
-    expect(`${baseUrl}/api/v1/data`).toBe('http://test-api/api/v1/data');
+  it('gets data with a bearer token', async () => {
+    const tree: TreeDto = { pages: [] };
+    const promise = service.getData('token-1');
+    const req = http.expectOne('/api/v1/data');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer token-1');
+    req.flush(tree);
+    await expect(promise).resolves.toEqual(tree);
   });
 
-  it('formats Authorization header correctly', () => {
-    const token = 'abc-def-123';
-    const header = `Bearer ${token}`;
-    expect(header).toBe('Bearer abc-def-123');
+  it('puts data with a bearer token', async () => {
+    const tree: TreeDto = { pages: [] };
+    const promise = service.putData('token-1', tree);
+    const req = http.expectOne('/api/v1/data');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer token-1');
+    expect(req.request.body).toBe(tree);
+    req.flush(null);
+    await expect(promise).resolves.toBeUndefined();
   });
 });

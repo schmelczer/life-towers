@@ -23,9 +23,9 @@ export class ApiService {
     );
   }
 
-  putData(token: string, tree: TreeDto): Promise<void> {
-    return firstValueFrom(
-      this.http.put<void>('/api/v1/data', tree, { headers: this.authHeaders(token) }),
+  async putData(token: string, tree: TreeDto): Promise<void> {
+    await firstValueFrom(
+      this.http.put('/api/v1/data', tree, { headers: this.authHeaders(token) }),
     );
   }
 

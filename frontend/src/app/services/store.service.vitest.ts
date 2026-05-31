@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { StoreService } from './store.service';
 import { ApiService } from './api.service';
+import { AnalyticsService } from './analytics.service';
 import type { TreeDto } from '../models';
 
 // ── localStorage stub ────────────────────────────────────────────────────────
@@ -63,7 +64,10 @@ function makeMockApi(): MockApi {
 
 const FIXED_UUID = '11111111-2222-4333-8444-555555555555';
 const TOKEN_KEY = 'life-towers.token.v4';
-const CACHE_KEY = 'life-towers.cache.v4';
+const CACHE_KEY = `life-towers.cache.v4.${FIXED_UUID}`;
+const PENDING_CACHE_KEY = `life-towers.cache-pending.v4.${FIXED_UUID}`;
+const OTHER_TOKEN = 'aaaabbbb-cccc-4ddd-8eee-ffffffffffff';
+const OTHER_CACHE_KEY = `life-towers.cache.v4.${OTHER_TOKEN}`;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function configure(api: MockApi): StoreService {
@@ -72,6 +76,18 @@ function configure(api: MockApi): StoreService {
     providers: [
       provideZonelessChangeDetection(),
       { provide: ApiService, useValue: api },
+      {
+        provide: AnalyticsService,
+        useValue: {
+          init: vi.fn(),
+          trackStart: vi.fn(),
+          trackExampleLoaded: vi.fn(),
+          trackPageCreated: vi.fn(),
+          trackTowerCreated: vi.fn(),
+          trackBlockCreated: vi.fn(),
+          trackBlockCompleted: vi.fn(),
+        },
+      },
       StoreService,
     ],
   });
@@ -134,6 +150,18 @@ describe('StoreService', () => {
     await store.init();
 
     expect(api.register).not.toHaveBeenCalled();
+    expect(store.token()).toBe(FIXED_UUID);
+  });
+
+  it('canonicalizes a stored uppercase token', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID.toUpperCase();
+    const api = makeMockApi();
+    const store = configure(api);
+
+    await store.init();
+
+    expect(storage[TOKEN_KEY]).toBe(FIXED_UUID);
+    expect(api.getData).toHaveBeenCalledWith(FIXED_UUID);
     expect(store.token()).toBe(FIXED_UUID);
   });
 
@@ -218,6 +246,98 @@ describe('StoreService', () => {
     expect(api.getData).toHaveBeenCalledTimes(1);
   });
 
+  it('moves a pending block to the end when it becomes done', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.getData.mockResolvedValue({
+      pages: [
+        {
+          id: 'page-1',
+          name: 'Page',
+          hide_create_tower_button: false,
+          keep_tasks_open: false,
+          default_date_from: null,
+          default_date_to: null,
+          towers: [
+            {
+              id: 'tower-1',
+              name: 'Tower',
+              base_color: { h: 0.5, s: 0.5, l: 0.5 },
+              blocks: [
+                {
+                  id: 'old-pending',
+                  tag: 'a',
+                  description: 'Created first, completed last',
+                  is_done: false,
+                  difficulty: 1,
+                  created_at: 100,
+                },
+                {
+                  id: 'newer-pending',
+                  tag: 'b',
+                  description: 'Still pending',
+                  is_done: false,
+                  difficulty: 1,
+                  created_at: 300,
+                },
+                {
+                  id: 'existing-done',
+                  tag: 'c',
+                  description: 'Already done',
+                  is_done: true,
+                  difficulty: 1,
+                  created_at: 200,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } satisfies TreeDto);
+    const store = configure(api);
+    await store.init();
+
+    store.updateBlock('page-1', 'tower-1', 'old-pending', { is_done: true });
+
+    const blocks = store.pages()[0].towers[0].blocks;
+    expect(blocks.map((b) => b.id)).toEqual([
+      'newer-pending',
+      'existing-done',
+      'old-pending',
+    ]);
+    expect(blocks[2].created_at).toBe(100);
+  });
+
+  it('loads welcome example data with a stack of completed squares per tower', () => {
+    const api = makeMockApi();
+    const store = configure(api);
+
+    const pageId = store.loadExample();
+
+    const [page] = store.pages();
+    expect(page.id).toBe(pageId);
+    expect(page.name).toBe('Hobbies');
+    expect(page.towers).toHaveLength(3);
+
+    const doneBlocks = page.towers.flatMap((tower) => tower.blocks.filter((b) => b.is_done));
+    const doneSquares = doneBlocks.reduce((sum, block) => sum + block.difficulty, 0);
+    expect(doneSquares).toBeGreaterThanOrEqual(90);
+    expect(new Set(page.towers.flatMap((tower) => tower.blocks.map((b) => b.difficulty))).size)
+      .toBeGreaterThan(1);
+
+    for (const tower of page.towers) {
+      const doneDates = tower.blocks.filter((b) => b.is_done).map((b) => b.created_at);
+      const doneSquareCount = tower.blocks
+        .filter((b) => b.is_done)
+        .reduce((sum, block) => sum + block.difficulty, 0);
+      expect(doneSquareCount).toBeGreaterThanOrEqual(30);
+      expect(doneDates).toEqual([...doneDates].sort((a, b) => a - b));
+      expect(new Set(tower.blocks.map((b) => b.difficulty)).size).toBeGreaterThan(1);
+    }
+
+    store.ngOnDestroy();
+  });
+
   // ── Debounced save ─────────────────────────────────────────────────────────
 
   it('debounces saves: multiple mutations within 750ms → one PUT', async () => {
@@ -233,6 +353,7 @@ describe('StoreService', () => {
     expect(api.putData).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(750);
     expect(api.putData).toHaveBeenCalledTimes(1);
+    expect(storage[PENDING_CACHE_KEY]).toBeUndefined();
     const [, tree] = api.putData.mock.calls[0];
     expect((tree as TreeDto).pages).toHaveLength(3);
   });
@@ -261,6 +382,97 @@ describe('StoreService', () => {
     expect(api.putData).toHaveBeenCalledTimes(2);
     const lastTree = api.putData.mock.calls[1][1] as TreeDto;
     expect(lastTree.pages).toHaveLength(2);
+  });
+
+  it('does not let an older in-flight save clear a newer pending cache entry', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    let resolveFirstPut: (() => void) | null = null;
+    api.putData
+      .mockReturnValueOnce(new Promise<void>((res) => (resolveFirstPut = () => res())))
+      .mockResolvedValueOnce(undefined);
+    const store = configure(api);
+    await store.init();
+
+    store.addPage('first');
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(1);
+
+    store.addPage('second');
+    expect(JSON.parse(storage[CACHE_KEY]).pages.map((p: TreeDto['pages'][number]) => p.name))
+      .toEqual(['first', 'second']);
+    expect(storage[PENDING_CACHE_KEY]).toBe('1');
+
+    resolveFirstPut!();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(JSON.parse(storage[CACHE_KEY]).pages.map((p: TreeDto['pages'][number]) => p.name))
+      .toEqual(['first', 'second']);
+    expect(storage[PENDING_CACHE_KEY]).toBe('1');
+
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(2);
+    expect(storage[PENDING_CACHE_KEY]).toBeUndefined();
+  });
+
+  it('keeps a pending local mutation across reload before the debounce saves', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const serverPage = mkPage('server');
+    api.getData.mockResolvedValue({ pages: [serverPage] });
+    const store = configure(api);
+    await store.init();
+
+    store.updatePage(FIXED_UUID, { keep_tasks_open: true });
+
+    expect(JSON.parse(storage[CACHE_KEY]).pages[0].keep_tasks_open).toBe(true);
+    expect(storage[PENDING_CACHE_KEY]).toBe('1');
+    store.ngOnDestroy();
+
+    const reloadedApi = makeMockApi();
+    reloadedApi.getData.mockResolvedValue({ pages: [serverPage] });
+    const reloadedStore = configure(reloadedApi);
+    await reloadedStore.init();
+
+    expect(reloadedStore.pages()[0].keep_tasks_open).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(750);
+    expect(reloadedApi.putData).toHaveBeenCalledTimes(1);
+    const [, tree] = reloadedApi.putData.mock.calls[0];
+    expect((tree as TreeDto).pages[0].keep_tasks_open).toBe(true);
+  });
+
+  it('does not let a stale in-flight save clear a newer pending settings cache', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const serverPage = mkPage('server');
+    let resolveFirstPut: (() => void) | null = null;
+    api.getData.mockResolvedValue({ pages: [serverPage] });
+    api.putData
+      .mockReturnValueOnce(new Promise<void>((res) => (resolveFirstPut = () => res())))
+      .mockResolvedValueOnce(undefined);
+    const store = configure(api);
+    await store.init();
+
+    store.updatePage(FIXED_UUID, { name: 'renamed' });
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(1);
+    expect((api.putData.mock.calls[0][1] as TreeDto).pages[0].keep_tasks_open).toBe(false);
+
+    store.updatePage(FIXED_UUID, { keep_tasks_open: true });
+    expect(JSON.parse(storage[CACHE_KEY]).pages[0].keep_tasks_open).toBe(true);
+    expect(storage[PENDING_CACHE_KEY]).toBe('1');
+
+    resolveFirstPut!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(JSON.parse(storage[CACHE_KEY]).pages[0].keep_tasks_open).toBe(true);
+    expect(storage[PENDING_CACHE_KEY]).toBe('1');
+
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(2);
+    expect((api.putData.mock.calls[1][1] as TreeDto).pages[0].keep_tasks_open).toBe(true);
+    expect(JSON.parse(storage[CACHE_KEY]).pages[0].keep_tasks_open).toBe(true);
+    expect(storage[PENDING_CACHE_KEY]).toBeUndefined();
   });
 
   // ── Error handling ────────────────────────────────────────────────────────
@@ -350,15 +562,73 @@ describe('StoreService', () => {
 
     // Mutate, then switch BEFORE the debounce fires.
     store.addPage('old-account');
-    const newToken = 'aaaabbbb-cccc-4ddd-8eee-ffffffffffff';
     api.getData.mockResolvedValue({ pages: [] });
-    store.switchToken(newToken);
+    store.switchToken(OTHER_TOKEN);
 
     // Run all timers — the OLD debounce must have been cancelled,
     // so no PUT should have happened.
     await vi.advanceTimersByTimeAsync(2000);
     expect(api.putData).not.toHaveBeenCalled();
-    expect(store.token()).toBe(newToken);
+    expect(store.token()).toBe(OTHER_TOKEN);
+  });
+
+  it('switchToken invalidates an init already in flight', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    let resolveFirstGet: ((v: TreeDto) => void) | null = null;
+    api.getData
+      .mockReturnValueOnce(new Promise<TreeDto>((res) => (resolveFirstGet = res)))
+      .mockResolvedValueOnce({ pages: [mkPage('new-account')] });
+    const store = configure(api);
+
+    const firstInit = store.init();
+    store.switchToken(OTHER_TOKEN);
+    resolveFirstGet!({ pages: [mkPage('old-account')] });
+    await firstInit;
+
+    expect(api.getData).toHaveBeenCalledWith(OTHER_TOKEN);
+    expect(store.token()).toBe(OTHER_TOKEN);
+    expect(store.pages()[0].name).toBe('new-account');
+  });
+
+  it('switchToken cancels a pending retry without wedging future saves', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.putData
+      .mockRejectedValueOnce(httpError(429, { 'Retry-After': '30' }))
+      .mockResolvedValue(undefined);
+    const store = configure(api);
+    await store.init();
+
+    store.addPage('old-account');
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(1);
+
+    api.getData.mockResolvedValue({ pages: [] });
+    store.switchToken(OTHER_TOKEN);
+    await vi.advanceTimersByTimeAsync(0);
+
+    store.addPage('new-account');
+    await vi.advanceTimersByTimeAsync(750);
+
+    expect(api.putData).toHaveBeenCalledTimes(2);
+    expect(api.putData.mock.calls[1][0]).toBe(OTHER_TOKEN);
+    expect((api.putData.mock.calls[1][1] as TreeDto).pages[0].name).toBe('new-account');
+  });
+
+  it('does not load another account cache after switching tokens', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    storage[CACHE_KEY] = JSON.stringify({ pages: [mkPage('old-cache')] } satisfies TreeDto);
+    const api = makeMockApi();
+    const store = configure(api);
+    await store.init();
+
+    api.getData.mockRejectedValue(httpError(0));
+    store.switchToken(OTHER_TOKEN);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(storage[OTHER_CACHE_KEY]).toBeUndefined();
+    expect(store.pages()).toHaveLength(0);
   });
 
   it('switchToken rejects a non-UUIDv4 input', () => {
@@ -368,6 +638,19 @@ describe('StoreService', () => {
 
     store.switchToken('not-a-uuid');
     expect(store.token()).toBe(''); // never initialized
+  });
+
+  it('switchToken canonicalizes uppercase UUID input', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const store = configure(api);
+    await store.init();
+
+    store.switchToken(OTHER_TOKEN.toUpperCase());
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(store.token()).toBe(OTHER_TOKEN);
+    expect(storage[TOKEN_KEY]).toBe(OTHER_TOKEN);
   });
 
   // ── Cross-tab sync ────────────────────────────────────────────────────────

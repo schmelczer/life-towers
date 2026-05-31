@@ -5,7 +5,7 @@ import { Injectable, computed, signal } from '@angular/core';
  * mount and decrements on destroy. Consumers read `anyOpen` to react.
  *
  * Used by `page.component` to disable tower drag-and-drop while any modal
- * (block-edit carousel, page-settings, tower-settings, confirm-delete,
+ * (block-edit carousel, settings, tower-settings, confirm-delete,
  * settings) is on screen — otherwise the user can drag towers from behind
  * the open card.
  */

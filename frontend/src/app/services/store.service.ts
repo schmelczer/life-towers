@@ -1,9 +1,11 @@
-import { Injectable, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Injectable, inject, signal, OnDestroy } from '@angular/core';
 import { ApiService } from './api.service';
+import { AnalyticsService } from './analytics.service';
 import { Page, Tower, Block, TreeDto, SaveStatus, HslColor } from '../models';
 
 const TOKEN_KEY = 'life-towers.token.v4';
-const CACHE_KEY = 'life-towers.cache.v4';
+const CACHE_KEY_PREFIX = 'life-towers.cache.v4';
+const PENDING_CACHE_KEY_PREFIX = 'life-towers.cache-pending.v4';
 const DEBOUNCE_MS = 750;
 const MAX_RETRIES = 5;
 
@@ -28,7 +30,7 @@ function uuidV4(): string {
 
 function isUuidV4(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-    value,
+    value.toLowerCase(),
   );
 }
 
@@ -49,15 +51,47 @@ function safeSet(key: string, value: string): void {
     /* ignore */
   }
 }
+function safeRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+function cacheKeyForToken(token: string): string {
+  return `${CACHE_KEY_PREFIX}.${token}`;
+}
+
+function pendingCacheKeyForToken(token: string): string {
+  return `${PENDING_CACHE_KEY_PREFIX}.${token}`;
+}
 
 interface PendingPut {
   token: string;
   tree: TreeDto;
+  revision: number;
 }
+
+interface ExampleBlockSeed {
+  tag: string;
+  desc: string;
+  done: boolean;
+  difficulty?: number;
+  ageHrs: number;
+}
+
+interface ExampleDonePattern {
+  tag: string;
+  desc: (sequence: number) => string;
+}
+
+const EXAMPLE_DONE_BLOCKS_PER_TOWER = 12;
 
 @Injectable({ providedIn: 'root' })
 export class StoreService implements OnDestroy {
   private readonly api = inject(ApiService);
+  private readonly analytics = inject(AnalyticsService);
 
   // ── State ──────────────────────────────────────────────────────────────────
   private readonly _pages = signal<Page[]>([]);
@@ -70,26 +104,22 @@ export class StoreService implements OnDestroy {
   readonly loading = this._loading.asReadonly();
   readonly token = this._token.asReadonly();
 
-  readonly pageCount = computed(() => this._pages().length);
-
   // ── Debounce / retry ───────────────────────────────────────────────────────
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryResolver: (() => void) | null = null;
   private flushInFlight = false;
   // True while in-flight if a new mutation arrived; we'll re-flush after.
   private dirtyDuringFlush = false;
+  // Monotonic local mutation version. Prevents an older in-flight PUT from
+  // clearing a newer pending cache entry when it completes.
+  private localMutationRevision = 0;
 
   // ── Cross-tab sync ─────────────────────────────────────────────────────────
   private readonly storageListener = (e: StorageEvent) => {
     if (e.key === TOKEN_KEY && e.newValue && e.newValue !== this._token()) {
-      // Another tab switched accounts. Re-init with the new token instead of
-      // continuing to sync the old account's state to the new one.
-      this._token.set(e.newValue);
-      this._pages.set([]);
-      this._loading.set(true);
-      this.cancelPendingWrites();
-      void this.init();
-    } else if (e.key === CACHE_KEY && e.newValue && !this.flushInFlight) {
+      this.switchToken(e.newValue);
+    } else if (e.key === cacheKeyForToken(this._token()) && e.newValue && !this.flushInFlight) {
       // Another tab just wrote a fresh cache; adopt it if we're not mid-save
       // (to avoid clobbering our own state with the other tab's older view).
       try {
@@ -103,17 +133,21 @@ export class StoreService implements OnDestroy {
 
   // ── Single-flight init ─────────────────────────────────────────────────────
   private initPromise: Promise<void> | null = null;
+  private initGeneration = 0;
 
   // ── Init ───────────────────────────────────────────────────────────────────
   async init(): Promise<void> {
     if (this.initPromise) return this.initPromise;
-    this.initPromise = this.doInit().finally(() => {
-      this.initPromise = null;
+    const generation = ++this.initGeneration;
+    this.initPromise = this.doInit(generation).finally(() => {
+      if (this.initGeneration === generation) {
+        this.initPromise = null;
+      }
     });
     return this.initPromise;
   }
 
-  private async doInit(): Promise<void> {
+  private async doInit(generation: number): Promise<void> {
     if (typeof window !== 'undefined') {
       // (idempotent — adding the same listener twice is a no-op)
       window.addEventListener('storage', this.storageListener);
@@ -123,6 +157,9 @@ export class StoreService implements OnDestroy {
     if (stored && !isUuidV4(stored)) {
       // Garbage in localStorage from a buggy past version — refuse it.
       stored = null;
+    } else if (stored) {
+      stored = stored.toLowerCase();
+      safeSet(TOKEN_KEY, stored);
     }
     const token = stored ?? uuidV4();
     if (!stored) {
@@ -140,7 +177,7 @@ export class StoreService implements OnDestroy {
 
     try {
       const tree = await this.api.getData(token);
-      this.adoptServerTree(tree);
+      if (this.isCurrentInit(generation, token)) this.adoptServerTree(tree, token);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 401) {
@@ -148,16 +185,22 @@ export class StoreService implements OnDestroy {
         try {
           await this.api.register(token);
           const tree = await this.api.getData(token);
-          this.adoptServerTree(tree);
+          if (this.isCurrentInit(generation, token)) this.adoptServerTree(tree, token);
         } catch {
-          this.loadFromCache();
+          if (this.isCurrentInit(generation, token)) this.loadFromCache(token);
         }
       } else {
-        this.loadFromCache();
+        if (this.isCurrentInit(generation, token)) this.loadFromCache(token);
       }
     } finally {
-      this._loading.set(false);
+      if (this.initGeneration === generation) {
+        this._loading.set(false);
+      }
     }
+  }
+
+  private isCurrentInit(generation: number, token: string): boolean {
+    return this.initGeneration === generation && this._token() === token;
   }
 
   /**
@@ -165,40 +208,50 @@ export class StoreService implements OnDestroy {
    * cache holds data, the cache wins and we schedule a push — otherwise the
    * "server forgot me" recovery would silently wipe offline edits.
    */
-  private adoptServerTree(tree: TreeDto): void {
+  private adoptServerTree(tree: TreeDto, token: string): void {
+    if (safeGet(pendingCacheKeyForToken(token))) {
+      const cachedTree = this.readCachedTree(token);
+      if (cachedTree?.pages && cachedTree.pages.length > 0) {
+        this._pages.set(cachedTree.pages);
+        this.scheduleSave();
+        return;
+      }
+    }
+
     if (tree.pages.length === 0) {
-      const cached = safeGet(CACHE_KEY);
-      if (cached) {
-        try {
-          const cachedTree: TreeDto = JSON.parse(cached);
-          if (cachedTree.pages && cachedTree.pages.length > 0) {
-            this._pages.set(cachedTree.pages);
-            this.scheduleSave();
-            return;
-          }
-        } catch {
-          /* fall through to server-empty */
-        }
+      const cachedTree = this.readCachedTree(token);
+      if (cachedTree?.pages && cachedTree.pages.length > 0) {
+        this._pages.set(cachedTree.pages);
+        this.scheduleSave();
+        return;
       }
     }
     this._pages.set(tree.pages);
-    this.updateCache(tree);
+    this.updateCache(token, tree);
   }
 
-  private loadFromCache(): void {
-    const raw = safeGet(CACHE_KEY);
-    if (raw) {
-      try {
-        const tree: TreeDto = JSON.parse(raw);
-        this._pages.set(tree.pages);
-      } catch {
-        /* ignore */
-      }
+  private loadFromCache(token: string): void {
+    const tree = this.readCachedTree(token);
+    if (tree) this._pages.set(tree.pages);
+  }
+
+  private readCachedTree(token: string): TreeDto | null {
+    const raw = safeGet(cacheKeyForToken(token));
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as TreeDto;
+    } catch {
+      return null;
     }
   }
 
-  private updateCache(tree: TreeDto): void {
-    safeSet(CACHE_KEY, JSON.stringify(tree));
+  private updateCache(token: string, tree: TreeDto, pending = false): void {
+    safeSet(cacheKeyForToken(token), JSON.stringify(tree));
+    if (pending) {
+      safeSet(pendingCacheKeyForToken(token), '1');
+    } else {
+      safeRemove(pendingCacheKeyForToken(token));
+    }
   }
 
   private cancelPendingWrites(): void {
@@ -209,6 +262,11 @@ export class StoreService implements OnDestroy {
     if (this.retryTimer !== null) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
+    }
+    if (this.retryResolver !== null) {
+      const resolve = this.retryResolver;
+      this.retryResolver = null;
+      resolve();
     }
     this.dirtyDuringFlush = false;
   }
@@ -226,6 +284,8 @@ export class StoreService implements OnDestroy {
       towers: [],
     };
     this._pages.update((pages) => [...pages, page]);
+    this.analytics.trackStart();
+    this.analytics.trackPageCreated();
     this.scheduleSave();
   }
 
@@ -242,13 +302,13 @@ export class StoreService implements OnDestroy {
   }
 
   reorderPages(fromIndex: number, toIndex: number): void {
+    let changed = false;
     this._pages.update((pages) => {
-      const arr = [...pages];
-      const [item] = arr.splice(fromIndex, 1);
-      arr.splice(toIndex, 0, item);
-      return arr;
+      const reordered = reorder(pages, fromIndex, toIndex);
+      changed = reordered !== null;
+      return reordered ?? pages;
     });
-    this.scheduleSave();
+    if (changed) this.scheduleSave();
   }
 
   addTower(pageId: string, name: string, base_color: HslColor): void {
@@ -256,6 +316,8 @@ export class StoreService implements OnDestroy {
     this._pages.update((pages) =>
       pages.map((p) => (p.id === pageId ? { ...p, towers: [...p.towers, tower] } : p)),
     );
+    this.analytics.trackStart();
+    this.analytics.trackTowerCreated();
     this.scheduleSave();
   }
 
@@ -280,16 +342,17 @@ export class StoreService implements OnDestroy {
   }
 
   reorderTowers(pageId: string, fromIndex: number, toIndex: number): void {
+    let changed = false;
     this._pages.update((pages) =>
       pages.map((p) => {
         if (p.id !== pageId) return p;
-        const towers = [...p.towers];
-        const [item] = towers.splice(fromIndex, 1);
-        towers.splice(toIndex, 0, item);
+        const towers = reorder(p.towers, fromIndex, toIndex);
+        if (towers === null) return p;
+        changed = true;
         return { ...p, towers };
       }),
     );
-    this.scheduleSave();
+    if (changed) this.scheduleSave();
   }
 
   addBlock(
@@ -298,26 +361,30 @@ export class StoreService implements OnDestroy {
     tag: string,
     description: string,
     is_done = false,
+    difficulty = 1,
   ): void {
     const block: Block = {
       id: uuidV4(),
       tag,
       description,
       is_done,
+      difficulty,
       created_at: Math.floor(Date.now() / 1000),
     };
     this._pages.update((pages) =>
       pages.map((p) =>
         p.id === pageId
           ? {
-              ...p,
-              towers: p.towers.map((t) =>
-                t.id === towerId ? { ...t, blocks: [...t.blocks, block] } : t,
-              ),
-            }
+            ...p,
+            towers: p.towers.map((t) =>
+              t.id === towerId ? { ...t, blocks: [...t.blocks, block] } : t,
+            ),
+          }
           : p,
       ),
     );
+    this.analytics.trackStart();
+    this.analytics.trackBlockCreated({ isDone: is_done });
     this.scheduleSave();
   }
 
@@ -327,23 +394,29 @@ export class StoreService implements OnDestroy {
     blockId: string,
     patch: Partial<Omit<Block, 'id' | 'created_at'>>,
   ): void {
+    let becameDone = false;
     this._pages.update((pages) =>
       pages.map((p) =>
         p.id === pageId
           ? {
-              ...p,
-              towers: p.towers.map((t) =>
-                t.id === towerId
-                  ? {
-                      ...t,
-                      blocks: t.blocks.map((b) => (b.id === blockId ? { ...b, ...patch } : b)),
-                    }
-                  : t,
-              ),
-            }
+            ...p,
+            towers: p.towers.map((t) =>
+              t.id === towerId
+                ? (() => {
+                  const result = this.patchBlockList(t.blocks, blockId, patch);
+                  becameDone = result.becameDone;
+                  return { ...t, blocks: result.blocks };
+                })()
+                : t,
+            ),
+          }
           : p,
       ),
     );
+    if (becameDone) {
+      this.analytics.trackStart();
+      this.analytics.trackBlockCompleted();
+    }
     this.scheduleSave();
   }
 
@@ -352,40 +425,49 @@ export class StoreService implements OnDestroy {
       pages.map((p) =>
         p.id === pageId
           ? {
-              ...p,
-              towers: p.towers.map((t) =>
-                t.id === towerId
-                  ? { ...t, blocks: t.blocks.filter((b) => b.id !== blockId) }
-                  : t,
-              ),
-            }
+            ...p,
+            towers: p.towers.map((t) =>
+              t.id === towerId
+                ? { ...t, blocks: t.blocks.filter((b) => b.id !== blockId) }
+                : t,
+            ),
+          }
           : p,
       ),
     );
     this.scheduleSave();
   }
 
-  toggleBlock(pageId: string, towerId: string, blockId: string): void {
-    this._pages.update((pages) =>
-      pages.map((p) =>
-        p.id === pageId
-          ? {
-              ...p,
-              towers: p.towers.map((t) =>
-                t.id === towerId
-                  ? {
-                      ...t,
-                      blocks: t.blocks.map((b) =>
-                        b.id === blockId ? { ...b, is_done: !b.is_done } : b,
-                      ),
-                    }
-                  : t,
-              ),
-            }
-          : p,
-      ),
-    );
-    this.scheduleSave();
+  private patchBlockList(
+    blocks: Block[],
+    blockId: string,
+    patch: Partial<Omit<Block, 'id' | 'created_at'>>,
+  ): { blocks: Block[]; becameDone: boolean } {
+    const nextBlocks: Block[] = [];
+    let completedBlock: Block | null = null;
+    let becameDone = false;
+
+    for (const block of blocks) {
+      if (block.id !== blockId) {
+        nextBlocks.push(block);
+        continue;
+      }
+
+      const updated: Block = { ...block, ...patch };
+      becameDone = !block.is_done && updated.is_done;
+      if (becameDone) {
+        // Display newly completed todos as the newest square, without changing
+        // created_at because the date slider still filters on creation time.
+        completedBlock = updated;
+      } else {
+        nextBlocks.push(updated);
+      }
+    }
+
+    return {
+      blocks: completedBlock ? [...nextBlocks, completedBlock] : nextBlocks,
+      becameDone,
+    };
   }
 
   /**
@@ -395,19 +477,27 @@ export class StoreService implements OnDestroy {
    * if the timing flipped).
    */
   switchToken(newToken: string): void {
-    if (!isUuidV4(newToken)) return;
+    const token = newToken.toLowerCase();
+    if (!isUuidV4(token)) return;
     this.cancelPendingWrites();
-    safeSet(TOKEN_KEY, newToken);
-    this._token.set(newToken);
+    this.initGeneration++;
+    this.initPromise = null;
+    safeSet(TOKEN_KEY, token);
+    this._token.set(token);
     this._pages.set([]);
     this._loading.set(true);
     this._saveStatus.set('idle');
+    this.localMutationRevision = 0;
     void this.init();
   }
 
   // ── Save / sync ────────────────────────────────────────────────────────────
 
   private scheduleSave(): void {
+    this.localMutationRevision += 1;
+    const token = this._token();
+    if (token) this.updateCache(token, { pages: this._pages() }, true);
+
     if (this.flushInFlight) {
       // A save is already happening. Mark dirty so we re-flush when it finishes.
       this.dirtyDuringFlush = true;
@@ -435,6 +525,7 @@ export class StoreService implements OnDestroy {
 
     this.flushInFlight = true;
     this.dirtyDuringFlush = false;
+    const revision = this.localMutationRevision;
 
     // Cancel any pending retry — runFlush() supersedes it.
     if (this.retryTimer !== null) {
@@ -443,7 +534,7 @@ export class StoreService implements OnDestroy {
     }
 
     try {
-      await this.attempt({ token, tree: { pages: this._pages() } }, 0);
+      await this.attempt({ token, tree: { pages: this._pages() }, revision }, 0);
     } finally {
       this.flushInFlight = false;
       // Coalesce mutations that arrived during the flush into a fresh save.
@@ -459,7 +550,13 @@ export class StoreService implements OnDestroy {
     try {
       await this.api.putData(put.token, put.tree);
       this._saveStatus.set('saved');
-      this.updateCache(put.tree);
+      if (
+        this._token() === put.token &&
+        put.revision === this.localMutationRevision &&
+        !this.dirtyDuringFlush
+      ) {
+        this.updateCache(put.token, put.tree);
+      }
       return;
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
@@ -503,8 +600,10 @@ export class StoreService implements OnDestroy {
       }
 
       await new Promise<void>((resolve) => {
+        this.retryResolver = resolve;
         this.retryTimer = setTimeout(() => {
           this.retryTimer = null;
+          this.retryResolver = null;
           resolve();
         }, delayMs);
       });
@@ -512,13 +611,16 @@ export class StoreService implements OnDestroy {
       // The token may have changed during the wait — re-check before retrying.
       if (this._token() !== put.token) return;
       // Re-snapshot the latest pages so the retry pushes current state.
-      await this.attempt({ token: put.token, tree: { pages: this._pages() } }, attempt + 1);
+      await this.attempt(
+        { token: put.token, tree: { pages: this._pages() }, revision: put.revision },
+        attempt + 1,
+      );
     }
   }
 
   // ── Example data ──────────────────────────────────────────────────────────
 
-  loadExample(): void {
+  loadExample(): string {
     const now = Math.floor(Date.now() / 1000);
 
     const page: Page = {
@@ -529,38 +631,83 @@ export class StoreService implements OnDestroy {
       default_date_from: null,
       default_date_to: null,
       towers: [
+        // Done blocks are listed oldest-first so they fill the falling stack
+        // oldest → newest (left → right), matching the slider's old → new
+        // labels; pending tasks stay on top for the accordion.
         this.makeExampleTower('Reading', { h: 0.05, s: 0.7, l: 0.55 }, now, [
-          { tag: 'novel',   desc: 'Finish The Brothers Karamazov',  done: false, ageHrs: 0 },
-          { tag: 'novel',   desc: "Read Dostoyevsky's notes",       done: true,  ageHrs: 2 },
-          { tag: 'article', desc: 'How does WebAssembly GC work?',  done: true,  ageHrs: 6 },
-          { tag: 'paper',   desc: 'Re-read "Out of the Tar Pit"',   done: true,  ageHrs: 30 },
-          { tag: 'novel',   desc: 'Submit a short story',           done: true,  ageHrs: 72 },
+          {
+            tag: 'novel',
+            desc: 'Finish The Brothers Karamazov',
+            done: false,
+            difficulty: 4,
+            ageHrs: 0,
+          },
+          ...this.makeExampleDoneBlocks(
+            [
+              { tag: 'novel', desc: (n) => `Read chapter ${n}` },
+              { tag: 'paper', desc: (n) => `Annotated paper ${n}` },
+              { tag: 'article', desc: (n) => `Saved article notes ${n}` },
+              { tag: 'essay', desc: (n) => `Drafted reading response ${n}` },
+            ],
+            2,
+            8,
+          ),
         ]),
         this.makeExampleTower('Side projects', { h: 0.58, s: 0.65, l: 0.5 }, now, [
-          { tag: 'angular', desc: 'Modernise the towers app',       done: false, ageHrs: 0 },
-          { tag: 'rust',    desc: 'Port the sync layer to Tauri',   done: false, ageHrs: 1 },
-          { tag: 'angular', desc: 'Wire CDK drag-drop',             done: true,  ageHrs: 24 },
-          { tag: 'rust',    desc: 'Spike SQLite vs LMDB',           done: true,  ageHrs: 96 },
+          {
+            tag: 'angular',
+            desc: 'Modernise the towers app',
+            done: false,
+            difficulty: 3,
+            ageHrs: 0,
+          },
+          {
+            tag: 'rust',
+            desc: 'Port the sync layer to Tauri',
+            done: false,
+            difficulty: 5,
+            ageHrs: 1,
+          },
+          ...this.makeExampleDoneBlocks(
+            [
+              { tag: 'angular', desc: (n) => `Refined UI pass ${n}` },
+              { tag: 'rust', desc: (n) => `Completed systems spike ${n}` },
+              { tag: 'infra', desc: (n) => `Tuned deploy workflow ${n}` },
+              { tag: 'docs', desc: (n) => `Captured project note ${n}` },
+            ],
+            4,
+            9,
+          ),
         ]),
         this.makeExampleTower('Exercise', { h: 0.36, s: 0.6, l: 0.5 }, now, [
-          { tag: 'run',    desc: '10k Sunday',          done: false, ageHrs: 0 },
-          { tag: 'climb',  desc: 'Lead 6a outdoors',    done: false, ageHrs: 4 },
-          { tag: 'climb',  desc: 'Bouldering session',  done: true,  ageHrs: 12 },
-          { tag: 'run',    desc: 'Easy 5k loop',         done: true,  ageHrs: 48 },
-          { tag: 'climb',  desc: 'Top-roped 5c',         done: true,  ageHrs: 96 },
+          { tag: 'run', desc: '10k Sunday', done: false, difficulty: 2, ageHrs: 0 },
+          { tag: 'climb', desc: 'Lead 6a outdoors', done: false, difficulty: 4, ageHrs: 4 },
+          ...this.makeExampleDoneBlocks(
+            [
+              { tag: 'run', desc: (n) => `Easy run ${n}` },
+              { tag: 'climb', desc: (n) => `Bouldering session ${n}` },
+              { tag: 'mobility', desc: (n) => `Mobility circuit ${n}` },
+              { tag: 'strength', desc: (n) => `Strength session ${n}` },
+            ],
+            6,
+            11,
+          ),
         ]),
       ],
     };
 
     this._pages.update((pages) => [...pages, page]);
+    this.analytics.trackStart();
+    this.analytics.trackExampleLoaded();
     this.scheduleSave();
+    return page.id;
   }
 
   private makeExampleTower(
     name: string,
     base_color: HslColor,
     nowSec: number,
-    blocks: Array<{ tag: string; desc: string; done: boolean; ageHrs: number }>,
+    blocks: ExampleBlockSeed[],
   ): Tower {
     return {
       id: uuidV4(),
@@ -571,9 +718,28 @@ export class StoreService implements OnDestroy {
         tag: b.tag,
         description: b.desc,
         is_done: b.done,
+        difficulty: b.difficulty ?? 1,
         created_at: nowSec - Math.floor(b.ageHrs * 3600),
       })),
     };
+  }
+
+  private makeExampleDoneBlocks(
+    patterns: ExampleDonePattern[],
+    newestAgeHrs: number,
+    spacingHrs: number,
+  ): ExampleBlockSeed[] {
+    return Array.from({ length: EXAMPLE_DONE_BLOCKS_PER_TOWER }, (_, i) => {
+      const pattern = patterns[i % patterns.length];
+      const sequence = Math.floor(i / patterns.length) + 1;
+      return {
+        tag: pattern.tag,
+        desc: pattern.desc(sequence),
+        done: true,
+        difficulty: 1 + ((i + (i % patterns.length) * 2) % 5),
+        ageHrs: newestAgeHrs + (EXAMPLE_DONE_BLOCKS_PER_TOWER - 1 - i) * spacingHrs,
+      };
+    });
   }
 
   ngOnDestroy(): void {
@@ -582,4 +748,23 @@ export class StoreService implements OnDestroy {
       window.removeEventListener('storage', this.storageListener);
     }
   }
+}
+
+function reorder<T>(items: readonly T[], fromIndex: number, toIndex: number): T[] | null {
+  if (
+    fromIndex === toIndex ||
+    !Number.isInteger(fromIndex) ||
+    !Number.isInteger(toIndex) ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= items.length ||
+    toIndex >= items.length
+  ) {
+    return null;
+  }
+
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
 }

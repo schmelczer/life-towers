@@ -16,5 +16,5 @@ export function hash(s: string): number {
     h = ((h << 5) - h + s.charCodeAt(i)) | 0;
   }
   // Map the signed int32 to [0, 1) — same formula as legacy
-  return h / (Math.pow(2, 32) - 2) + 0.5;
+  return h / (2 ** 32 - 2) + 0.5;
 }

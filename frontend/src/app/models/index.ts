@@ -9,6 +9,8 @@ export interface Block {
   tag: string;
   description: string;
   is_done: boolean;
+  /** How many squares this block draws in the tower (>= 1). */
+  difficulty: number;
   created_at: number;
 }
 
@@ -38,7 +40,7 @@ export type SaveStatus =
   | 'saving'
   | 'saved'
   | 'retrying'
-  | 'error' // generic / network — will keep trying
-  | 'too-large' // 413 — payload exceeds the server cap, won't retry
+  | 'error' // generic / network — retries exhausted until the next mutation
+  | 'too-large' // 413 — payload exceeds the server cap, will not retry
   | 'rate-limited' // 429 — will retry after Retry-After
-  | 'invalid'; // 400 — server rejected the body, won't retry
+  | 'invalid'; // 400 — server rejected the body, will not retry
