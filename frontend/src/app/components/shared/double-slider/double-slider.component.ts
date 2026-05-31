@@ -18,7 +18,7 @@ export interface DoubleSliderRange<T> {
  * Two-thumb range slider — legacy "double-slider".
  * Hands an indexed range over an arbitrary values array; emits the
  * underlying values on each change. Labels magnetically lift as a thumb
- * approaches them (rotated -45°), per the legacy.
+ * approaches them (rotated -30°), per the legacy.
  */
 @Component({
   selector: 'lt-double-slider',
@@ -32,7 +32,7 @@ export interface DoubleSliderRange<T> {
         id="ds-1"
         type="range"
         min="0"
-        [max]="MAX - 1"
+        [max]="maxIndex()"
         [value]="oneValue()"
         (input)="oneValue.set(+$any($event.target).value)"
       />
@@ -40,7 +40,7 @@ export interface DoubleSliderRange<T> {
         id="ds-2"
         type="range"
         min="0"
-        [max]="MAX - 1"
+        [max]="maxIndex()"
         [value]="otherValue()"
         (input)="otherValue.set(+$any($event.target).value)"
       />
@@ -64,6 +64,11 @@ export interface DoubleSliderRange<T> {
       height: $height;
       position: relative;
       margin: calc(#{$slider-size} / 2) auto 0 auto;
+
+      @media (max-width: $mobile-width) {
+        max-width: 90vw;
+        margin-top: calc(#{$slider-size} / 2);
+      }
 
       label { display: none; }
 
@@ -145,6 +150,12 @@ export interface DoubleSliderRange<T> {
           transition: transform $long-animation-time;
           white-space: nowrap;
         }
+
+        @media (max-width: $mobile-width) {
+          font-size: var(--small-font-size);
+          margin-top: $slider-size;
+          span { margin-top: 10px; }
+        }
       }
     }
   `,
@@ -157,10 +168,9 @@ export class DoubleSliderComponent {
 
   readonly rangeChange = output<DoubleSliderRange<unknown>>();
 
-  readonly MAX = 100;
-
   readonly oneValue = signal(0);
-  readonly otherValue = signal(this.MAX - 1);
+  readonly otherValue = signal(0);
+  readonly maxIndex = computed(() => Math.max(0, this.values().length - 1));
 
   private prevValuesLength = 0;
 
@@ -187,42 +197,44 @@ export class DoubleSliderComponent {
       const hi = Math.max(a, b);
       untracked(() => {
         this.rangeChange.emit({
-          from: vs[this.indexFromValue(lo)],
-          to: vs[this.indexFromValue(hi)],
+          from: vs[this.clampIndex(lo)],
+          to: vs[this.clampIndex(hi)],
         });
       });
     });
 
-    // Snap the higher thumb to MAX - 1 when a new entry is appended.
+    // Snap the higher thumb to the newest value when a new entry is appended.
     effect(() => {
       const len = this.values().length;
       untracked(() => {
+        const max = Math.max(0, len - 1);
         if (len > this.prevValuesLength) {
           const a = this.oneValue();
           const b = this.otherValue();
-          if (a > b) this.oneValue.set(this.MAX - 1);
-          else this.otherValue.set(this.MAX - 1);
+          if (a > b) this.oneValue.set(max);
+          else this.otherValue.set(max);
+        } else {
+          if (this.oneValue() > max) this.oneValue.set(max);
+          if (this.otherValue() > max) this.otherValue.set(max);
         }
         this.prevValuesLength = len;
       });
     });
   }
 
-  private indexFromValue(value: number): number {
-    return Math.min(
-      this.values().length - 1,
-      Math.floor((value / this.MAX) * this.values().length),
-    );
+  private clampIndex(value: number): number {
+    return Math.max(0, Math.min(this.values().length - 1, Math.round(value)));
   }
 
   /**
    * Magnetic label position: returns a CSS `transform` that lifts the label
-   * upward and rotates -45° as a thumb approaches.
+   * upward and rotates -30° as a thumb approaches.
    */
   getOffset(index: number): string {
-    const labelIndex = index / Math.max(1, this.drawnLabels().length);
-    const a = this.oneValue() / this.MAX - 0.1;
-    const b = this.otherValue() / this.MAX - 0.1;
+    const labelIndex = index / Math.max(1, this.drawnLabels().length - 1);
+    const max = Math.max(1, this.maxIndex());
+    const a = this.oneValue() / max - 0.1;
+    const b = this.otherValue() / max - 0.1;
     const dist = Math.min(Math.abs(labelIndex - a), Math.abs(labelIndex - b));
     const ACTIVE_ZONE = 0.2;
     const base = 'translateX(-50%) rotate(-30deg) translateY(100%)';

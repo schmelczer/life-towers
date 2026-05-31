@@ -4,8 +4,9 @@ import {
   input,
   output,
   signal,
-  OnChanges,
-  SimpleChanges,
+  ElementRef,
+  HostListener,
+  inject,
 } from '@angular/core';
 
 @Component({
@@ -19,7 +20,15 @@ import {
       [class.always-shadow]="alwaysDropShadow()"
     >
       <div class="background" [class.active]="open()"></div>
-      <div class="top" (click)="open.update(v => !v)">
+      <div
+        class="top"
+        role="button"
+        tabindex="0"
+        [attr.aria-expanded]="open()"
+        (click)="toggleOpen($event)"
+        (keydown.enter)="toggleOpen($event)"
+        (keydown.space)="$event.preventDefault(); toggleOpen($event)"
+      >
         <p>{{ resolvedSelected() ?? placeholder() }}</p>
         <img class="arrow" [class.upside-down]="open()" src="assets/arrow.svg" alt="" />
       </div>
@@ -30,10 +39,13 @@ import {
               <input
                 type="text"
                 [value]="item"
+                maxlength="200"
                 (blur)="onRename(item, $any($event.target).value)"
               />
             } @else {
-              <p (click)="onSelectItem(item)">{{ item }}</p>
+              <button class="option" type="button" (click)="onSelectItem(item)">
+                {{ item }}
+              </button>
             }
           }
           <div class="add-row">
@@ -41,11 +53,23 @@ import {
               type="text"
               #addInput
               placeholder="Add a value…"
+              maxlength="200"
               (keydown.enter)="onAdd(addInput.value); addInput.value = ''"
             />
-            <button (click)="onAdd(addInput.value); addInput.value = ''">Add</button>
+            <button
+              class="add-button"
+              type="button"
+              (click)="onAdd(addInput.value); addInput.value = ''"
+            >
+              Add
+            </button>
             @if (editable()) {
-              <button class="pen" [class.active]="editing()" (click)="editing.update(v => !v)">
+              <button
+                class="pen"
+                type="button"
+                [class.active]="editing()"
+                (click)="editing.update(v => !v)"
+              >
                 <img src="assets/pen.svg" alt="Edit" />
               </button>
             }
@@ -58,6 +82,7 @@ import {
     @import '../../../../library/main';
 
     $inner-padding: var(--medium-padding);
+    $dropdown-shadow: 0 4px 14px rgba($text-color, 0.16), $shadow-border;
 
     :host {
       display: block;
@@ -80,13 +105,22 @@ import {
         align-items: center;
         position: relative;
         cursor: pointer;
+        min-height: 46px;
+        box-sizing: border-box;
+        gap: var(--small-padding);
 
         p {
-          display: inline-block;
+          display: block;
           @include sub-title-text();
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          text-align: left;
         }
 
         img.arrow {
+          flex: 0 0 auto;
           @include square(16px);
           transition: transform $long-animation-time;
 
@@ -98,81 +132,129 @@ import {
 
       .bottom-container {
         width: 100%;
-        height: 300px;
         position: absolute;
-        overflow-y: hidden;
+        top: 100%;
+        left: 0;
+        right: 0;
+        overflow: visible;
         pointer-events: none;
+        z-index: 5;
 
         .bottom {
-          position: absolute;
+          position: relative;
           width: 100%;
-          pointer-events: all;
+          pointer-events: none;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
           border-radius: 0 0 var(--border-radius) var(--border-radius);
           padding: $inner-padding;
-          padding-top: 0;
-          @include inner-spacing($inner-padding);
+          padding-top: var(--small-padding);
+          gap: var(--small-padding);
           // Default (closed) state — also the target of the close transition.
           background-color: transparent;
           box-shadow: none;
-          transform: translateY(-100%);
+          transform: translateY(-8px);
+          opacity: 0;
           visibility: hidden;
+          // Clip the top edge so the panel's shadow can't bleed back up into
+          // the chip area; sides + bottom get a 10px slack for the shadow.
+          clip-path: inset(0 -10px -10px -10px);
           // Delay the visibility change until after the slide animation finishes
           // so the panel stays visible while it animates closed.
           transition:
             transform $long-animation-time,
+            opacity $long-animation-time,
             background-color $long-animation-time,
             box-shadow $long-animation-time,
             visibility 0s $long-animation-time;
 
           &.open {
             visibility: visible;
+            pointer-events: all;
             transform: none;
+            opacity: 1;
             background-color: $light-color;
-            box-shadow: $shadow;
-            // Show shadow on left/right/bottom only; clip the top edge so the
-            // shadow doesn't bleed over the seam where .bottom meets .top.
-            clip-path: inset(0 -6px -6px -6px);
+            box-shadow: $dropdown-shadow;
             // On open, visibility flips immediately (no delay); transform +
             // colors + shadow animate over $long-animation-time.
             transition:
               transform $long-animation-time,
+              opacity $long-animation-time,
               background-color $long-animation-time,
               box-shadow $long-animation-time,
               visibility 0s 0s;
           }
 
-          p {
+          .option {
             @include sub-title-text();
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-height: 36px;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
             text-align: left;
             cursor: pointer;
+
+            &:after {
+              display: none;
+            }
+
+            @media (max-width: $mobile-width) {
+              min-height: 42px;
+            }
           }
 
           input[type='text'] {
             @include sub-title-text();
             width: 100%;
+            min-height: 36px;
+            box-sizing: border-box;
+            text-align: left;
+
+            &::placeholder {
+              color: rgba($text-color, 0.72);
+              opacity: 1;
+            }
+
+            @media (max-width: $mobile-width) {
+              min-height: 42px;
+            }
           }
 
           .add-row {
-            height: 32px;
-            @media (max-width: $mobile-width) { height: 24px; }
+            min-height: 40px;
             position: relative;
             width: 100%;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             gap: var(--small-padding);
 
             input[type='text'] {
               flex: 1;
+              min-height: 0;
+              padding: 0;
+              border-bottom: solid 2px transparent;
+
+              &:focus,
+              &:focus-visible {
+                box-shadow: none;
+                border-bottom-color: $text-color;
+              }
             }
 
             button {
               margin: 0;
-              position: static;
+              position: relative;
+              flex: 0 0 auto;
+
+              &.add-button {
+                align-self: flex-end;
+              }
 
               &.pen {
                 opacity: 0.25;
@@ -183,6 +265,10 @@ import {
                 border: none;
                 background: transparent;
                 position: relative;
+
+                // Kill the global button's hover-grow underline pseudo-element
+                // for the icon-only edit control.
+                &:after { content: none; display: none; }
 
                 img {
                   @include square(16px);
@@ -224,16 +310,18 @@ import {
         width: 100%;
         @include card();
         z-index: 3;
+        box-sizing: border-box;
         transition:
           box-shadow $long-animation-time,
           height $long-animation-time,
           border-radius $long-animation-time;
 
         &.active {
-          box-shadow: $shadow;
-          // Show shadow on top/left/right only; clip the bottom edge so the
-          // shadow doesn't bleed over the seam where .top meets .bottom.
-          clip-path: inset(-6px -6px 0 -6px);
+          // Same shadow recipe as the panel below so the two halves read as
+          // one continuous card. Clip the bottom edge so this shadow doesn't
+          // bleed across the seam where .top meets .bottom.
+          box-shadow: $dropdown-shadow;
+          clip-path: inset(-10px -10px 0 -10px);
         }
       }
 
@@ -251,25 +339,31 @@ import {
         }
       }
 
+      // Hover lifts the chip — but only when the dropdown is closed. When
+      // it's open the chip is already showing $dropdown-shadow and a hover
+      // override would make the top heavier than the panel below.
       &:hover {
         @media (min-width: $mobile-width) {
-          .background { box-shadow: $shadow; }
+          .background:not(.active) { box-shadow: $shadow; }
         }
       }
 
       &.shadow-border {
         .background.active {
           box-shadow: $shadow-border;
-          clip-path: inset(-6px -6px 0 -6px);
+          clip-path: inset(-10px -10px 0 -10px);
+        }
+        .bottom.open {
+          box-shadow: $shadow-border;
         }
       }
 
       &.shadow-border:hover {
-        .background { box-shadow: $shadow-border; }
+        .background:not(.active) { box-shadow: $shadow-border; }
       }
 
       &.always-shadow {
-        .background { box-shadow: $shadow; }
+        .background:not(.active) { box-shadow: $shadow; }
         // When open, clip the bottom so the always-on shadow doesn't bleed
         // over the seam; restore full shadow when closed.
         &:has(.bottom.open) .background {
@@ -279,7 +373,7 @@ import {
     }
   `,
 })
-export class SelectAddComponent implements OnChanges {
+export class SelectAddComponent {
   // ── New API (spec) ─────────────────────────────────────────────────────────
   /** List of string options */
   readonly items = input<string[]>([]);
@@ -309,6 +403,7 @@ export class SelectAddComponent implements OnChanges {
   // ── Internal state ─────────────────────────────────────────────────────────
   readonly open = signal(false);
   readonly editing = signal(false);
+  private readonly host = inject(ElementRef<HTMLElement>);
 
   // Resolved values that merge old + new API
   protected resolvedItems(): string[] {
@@ -320,7 +415,7 @@ export class SelectAddComponent implements OnChanges {
   protected resolvedSelected(): string | null {
     // New API: string
     const s = this.selected();
-    if (s != null) return s;
+    if (s != null && s.trim()) return s;
     // Legacy API: index into options
     const idx = this.selectedIndex();
     const opts = this.resolvedItems();
@@ -328,8 +423,18 @@ export class SelectAddComponent implements OnChanges {
     return null;
   }
 
-  ngOnChanges(_changes: SimpleChanges): void {
-    // Nothing to do — signals handle reactivity
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.open()) return;
+    if (!this.host.nativeElement.contains(event.target as Node)) {
+      this.open.set(false);
+      this.editing.set(false);
+    }
+  }
+
+  toggleOpen(event: Event): void {
+    event.stopPropagation();
+    this.open.update((v) => !v);
   }
 
   onSelectItem(item: string): void {

@@ -61,7 +61,10 @@ const FIXED_L = 0.55;
       display: block;
       padding: var(--medium-padding);
       @include card();
-      box-shadow: $shadow-border;
+      border: 1px solid rgba($text-color, 0.14);
+      box-shadow: inset 0 0 0 1px rgba($light-color, 0.7);
+      background-color: rgba($text-color, 0.025);
+      box-sizing: border-box;
     }
 
     .picker {
@@ -76,35 +79,40 @@ const FIXED_L = 0.55;
       grid-template-columns: repeat(12, 1fr);
       gap: 6px;
 
+      @media (max-width: $mobile-width) {
+        grid-template-columns: repeat(6, 1fr);
+        gap: var(--small-padding);
+      }
+
       .swatch {
         all: unset;
         cursor: pointer;
         aspect-ratio: 1;
         border-radius: 4px;
-        box-shadow: $shadow-border;
+        box-shadow: 0 0 0 1px rgba($text-color, 0.18);
         transition: transform $short-animation-time, box-shadow $long-animation-time;
 
         &:hover,
         &:focus-visible {
-          box-shadow: $shadow;
+          box-shadow: 0 0 0 2px $light-color, 0 0 0 4px rgba($text-color, 0.5);
           transform: scale(1.1);
         }
 
         &.active {
-          box-shadow: $shadow;
+          box-shadow: 0 0 0 2px $light-color, 0 0 0 4px rgba($text-color, 0.5);
           transform: scale(1.15);
-          outline: 2px solid $light-color;
-          outline-offset: 1px;
         }
       }
     }
 
     .hue-slider {
+      padding: 8px 0;
+
       input[type='range'] {
         -webkit-appearance: none;
         appearance: none;
         width: 100%;
-        height: 12px;
+        height: 16px;
         border-radius: 1000px;
         background: linear-gradient(
           to right,
@@ -119,11 +127,15 @@ const FIXED_L = 0.55;
         outline: none;
         cursor: pointer;
 
+        &:focus-visible {
+          box-shadow: 0 0 0 3px rgba($text-color, 0.35);
+        }
+
         &::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          height: 24px;
-          width: 24px;
+          height: 32px;
+          width: 32px;
           border-radius: 1000px;
           background-color: var(--thumb-color, #{$light-color});
           box-shadow: 0 0 0 2px #{$light-color}, #{$shadow};
@@ -135,8 +147,8 @@ const FIXED_L = 0.55;
         }
 
         &::-moz-range-thumb {
-          height: 24px;
-          width: 24px;
+          height: 32px;
+          width: 32px;
           border-radius: 1000px;
           background-color: var(--thumb-color, white);
           border: 2px solid white;
@@ -153,7 +165,7 @@ const FIXED_L = 0.55;
     .preview {
       height: 40px;
       border-radius: var(--border-radius);
-      box-shadow: $shadow-border;
+      box-shadow: 0 0 0 1px rgba($text-color, 0.18);
     }
   `,
 })
@@ -173,9 +185,8 @@ export class ColorPickerComponent {
     return `hsl(${h}, 70%, 55%)`;
   }
 
-  toCss(c: HslColor): string {
-    return toCss(c);
-  }
+  /** Re-exported so the template can call the utility directly. */
+  readonly toCss = toCss;
 
   pickHue(h: number): void {
     this.colorChange.emit({ h: h / 360, s: FIXED_S, l: FIXED_L });
