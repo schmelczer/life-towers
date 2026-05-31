@@ -13,7 +13,16 @@ import { getColorOfTag } from '../../utils/color';
   imports: [],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div [style.background-color]="color()" (click)="clicked.emit()"></div>
+    <div
+      role="button"
+      tabindex="0"
+      aria-label="Edit completed task"
+      [class.hovered]="hovered()"
+      [style.background-color]="color()"
+      (click)="clicked.emit()"
+      (keydown.enter)="clicked.emit()"
+      (keydown.space)="$event.preventDefault(); clicked.emit()"
+    ></div>
   `,
   styles: `
     @import '../../../library/main';
@@ -27,7 +36,16 @@ import { getColorOfTag } from '../../utils/color';
         position: absolute;
         width: 100%;
         height: 100%;
-        @include gravitate();
+        cursor: pointer;
+
+        @media (hover: hover) and (pointer: fine) {
+          transition: transform $long-animation-time;
+
+          &:hover,
+          &.hovered {
+            transform: translateY(4px);
+          }
+        }
       }
     }
   `,
@@ -35,6 +53,7 @@ import { getColorOfTag } from '../../utils/color';
 export class BlockComponent {
   readonly block = input.required<Block>();
   readonly baseColor = input.required<HslColor>();
+  readonly hovered = input(false);
 
   /** Emits when the square is clicked — parent opens the block-edit modal. */
   readonly clicked = output<void>();
