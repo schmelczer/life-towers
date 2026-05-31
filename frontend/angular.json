@@ -5,9 +5,9 @@
     "packageManager": "npm",
     "schematicCollections": [
       "angular-eslint"
-    ]
+    ],
+    "analytics": false
   },
-  "newProjectRoot": "projects",
   "projects": {
     "frontend": {
       "projectType": "application",
@@ -75,9 +75,6 @@
           "options": {
             "proxyConfig": "proxy.conf.json"
           }
-        },
-        "test": {
-          "builder": "@angular/build:unit-test"
         },
         "lint": {
           "builder": "@angular-eslint/builder:lint",
