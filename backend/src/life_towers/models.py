@@ -8,12 +8,14 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import uuid as _uuid_mod
 
 
-def _is_uuidv4(value: str) -> bool:
+def _canonical_uuidv4(value: str) -> str:
     try:
         u = _uuid_mod.UUID(value)
-        return u.version == 4
+        if u.version == 4:
+            return str(u)
     except (ValueError, AttributeError):
-        return False
+        pass
+    raise ValueError("must be a UUIDv4")
 
 
 class HslColor(BaseModel):
@@ -27,14 +29,13 @@ class BlockIn(BaseModel):
     tag: str = Field(max_length=200)
     description: str = Field(max_length=10_000)
     is_done: bool
+    difficulty: int = Field(default=1, ge=1, le=100)
     created_at: Optional[int] = None
 
     @field_validator("id")
     @classmethod
     def validate_id(cls, v: str) -> str:
-        if not _is_uuidv4(v):
-            raise ValueError(f"id must be a UUIDv4, got: {v!r}")
-        return v
+        return _canonical_uuidv4(v)
 
 
 class BlockOut(BaseModel):
@@ -42,6 +43,7 @@ class BlockOut(BaseModel):
     tag: str
     description: str
     is_done: bool
+    difficulty: int
     created_at: int
 
 
@@ -54,9 +56,7 @@ class TowerIn(BaseModel):
     @field_validator("id")
     @classmethod
     def validate_id(cls, v: str) -> str:
-        if not _is_uuidv4(v):
-            raise ValueError(f"id must be a UUIDv4, got: {v!r}")
-        return v
+        return _canonical_uuidv4(v)
 
 
 class TowerOut(BaseModel):
@@ -78,9 +78,7 @@ class PageIn(BaseModel):
     @field_validator("id")
     @classmethod
     def validate_id(cls, v: str) -> str:
-        if not _is_uuidv4(v):
-            raise ValueError(f"id must be a UUIDv4, got: {v!r}")
-        return v
+        return _canonical_uuidv4(v)
 
 
 class PageOut(BaseModel):
@@ -137,9 +135,7 @@ class RegisterRequest(BaseModel):
     @field_validator("token")
     @classmethod
     def validate_token(cls, v: str) -> str:
-        if not _is_uuidv4(v):
-            raise ValueError("token must be a UUIDv4")
-        return v
+        return _canonical_uuidv4(v)
 
 
 class RegisterResponse(BaseModel):

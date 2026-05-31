@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import time
 import uuid as _uuid_mod
+from hashlib import sha256
 
 import structlog
 from fastapi import Request, Response
+
+from .auth import extract_bearer_token
 
 
 def configure_logging() -> None:
@@ -26,19 +29,19 @@ def configure_logging() -> None:
     )
 
 
+def token_log_id(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()[:12]
+
+
 async def request_logging_middleware(request: Request, call_next) -> Response:
-    """Log each request with method, path, status, duration_ms, user_id, request_id."""
+    """Log each request without writing bearer credentials to the log stream."""
     request_id = str(_uuid_mod.uuid4())
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(request_id=request_id)
 
     # Extract user_id from Authorization header for logging (no DB call here)
-    auth = request.headers.get("Authorization") or request.headers.get("authorization")
-    user_id: str | None = None
-    if auth:
-        parts = auth.split()
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            user_id = parts[1]
+    token = extract_bearer_token(request)
+    user_id = token_log_id(token) if token else None
 
     start = time.monotonic()
     response = await call_next(request)

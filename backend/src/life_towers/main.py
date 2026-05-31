@@ -1,18 +1,17 @@
-"""ASGI app, lifespan, static files mount, route registration."""
-
 from __future__ import annotations
 
-import json
 import os
 from contextlib import asynccontextmanager
+from html import escape
 from pathlib import Path
 from typing import AsyncGenerator
+from urllib.parse import urlsplit, urlunsplit
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -35,7 +34,6 @@ STATUS_CODE_MAP: dict[int, str] = {
     413: "payload_too_large",
     422: "bad_request",
     429: "rate_limited",
-    507: "quota_exceeded",
     500: "server_error",
 }
 
@@ -92,10 +90,15 @@ def create_app() -> FastAPI:
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         fields = sorted(
-            {".".join(str(loc) for loc in e.get("loc", ()) if loc != "body") for e in exc.errors()}
+            field
+            for field in {
+                ".".join(str(loc) for loc in e.get("loc", ()) if loc != "body")
+                for e in exc.errors()
+            }
+            if field
         )
         if fields:
-            detail_str = "Validation failed for: " + ", ".join(f for f in fields if f)
+            detail_str = "Validation failed for: " + ", ".join(fields)
         else:
             detail_str = "Validation failed"
         return JSONResponse(
@@ -113,7 +116,7 @@ def create_app() -> FastAPI:
             code = STATUS_CODE_MAP.get(exc.status_code, "server_error")
             detail = {"error": code, "detail": str(exc.detail)}
 
-        headers = getattr(exc, "headers", None) or {}
+        headers = exc.headers or {}
         return JSONResponse(status_code=exc.status_code, content=detail, headers=headers)
 
     # Generic 500 handler
@@ -151,7 +154,44 @@ def _mount_static(app: FastAPI, static_dir: Path) -> None:
         r"[-.][A-Za-z0-9]{8,}\.(?:js|css|woff2?|png|jpe?g|svg|ico|map)$"
     )
 
-    def _serve_file(file_path: Path) -> FileResponse:
+    def _absolute_meta_urls(request: Request) -> tuple[str, str]:
+        configured_public_url = os.environ.get("LIFE_TOWERS_PUBLIC_URL", "").strip()
+        if configured_public_url:
+            public_root = configured_public_url.rstrip("/") + "/"
+            return public_root, f"{public_root}og-image.png"
+
+        parts = urlsplit(str(request.url))
+        canonical_url = urlunsplit((parts.scheme, parts.netloc, parts.path or "/", "", ""))
+
+        root_path = str(request.scope.get("root_path") or "").strip("/")
+        og_image_path = f"/{root_path}/og-image.png" if root_path else "/og-image.png"
+        og_image_url = urlunsplit((parts.scheme, parts.netloc, og_image_path, "", ""))
+        return canonical_url, og_image_url
+
+    def _serve_index(file_path: Path, request: Request) -> HTMLResponse:
+        canonical_url, og_image_url = _absolute_meta_urls(request)
+        html = file_path.read_text(encoding="utf-8")
+        html = html.replace(
+            'href="/" data-dynamic-url="canonical"',
+            f'href="{escape(canonical_url, quote=True)}" data-dynamic-url="canonical"',
+        )
+        html = html.replace(
+            'content="/" data-dynamic-url="canonical"',
+            f'content="{escape(canonical_url, quote=True)}" data-dynamic-url="canonical"',
+        )
+        html = html.replace(
+            'content="/og-image.png" data-dynamic-url="og-image"',
+            f'content="{escape(og_image_url, quote=True)}" data-dynamic-url="og-image"',
+        )
+
+        resp = HTMLResponse(html)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+    def _serve_file(file_path: Path, request: Request) -> Response:
+        if file_path.name == "index.html":
+            return _serve_index(file_path, request)
+
         resp = FileResponse(str(file_path))
         if HASHED_PATTERN.search(file_path.name):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
@@ -160,7 +200,7 @@ def _mount_static(app: FastAPI, static_dir: Path) -> None:
         return resp
 
     @app.get("/{full_path:path}", include_in_schema=False)
-    async def spa_fallback(full_path: str) -> Response:
+    async def spa_fallback(request: Request, full_path: str) -> Response:
         # API routes are handled by the API router (registered before this);
         # if execution reaches here for an /api/* path, it really is unknown.
         if full_path.startswith("api/"):
@@ -174,12 +214,12 @@ def _mount_static(app: FastAPI, static_dir: Path) -> None:
         except ValueError:
             raise HTTPException(status_code=404, detail="Not found")
         if candidate.is_file():
-            return _serve_file(candidate)
+            return _serve_file(candidate, request)
 
         # SPA fallback to index.html.
         index = static_dir / "index.html"
         if index.is_file():
-            return _serve_file(index)
+            return _serve_file(index, request)
 
         raise HTTPException(status_code=404, detail="Not found")
 

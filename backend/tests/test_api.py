@@ -51,15 +51,71 @@ async def client(tmp_path: Path) -> AsyncGenerator[AsyncClient, None]:
     db_module._DB_PATH = None
 
 
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
-
 @pytest.mark.asyncio
-async def test_health(client: AsyncClient) -> None:
-    resp = await client.get("/api/v1/health")
+async def test_spa_index_injects_absolute_open_graph_urls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text(
+        """
+<!doctype html>
+<html>
+  <head>
+    <link rel="canonical" href="/" data-dynamic-url="canonical" />
+    <meta property="og:url" content="/" data-dynamic-url="canonical" />
+    <meta property="og:image" content="/og-image.png" data-dynamic-url="og-image" />
+    <meta name="twitter:image" content="/og-image.png" data-dynamic-url="og-image" />
+  </head>
+</html>
+""",
+        encoding="utf-8",
+    )
+    (static_dir / "og-image.png").write_bytes(b"fake png")
+    monkeypatch.setenv("LIFE_TOWERS_STATIC_DIR", str(static_dir))
+
+    app = create_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="https://towers.example",
+    ) as c:
+        resp = await c.get("/tasks?utm_source=test")
+
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    assert (
+        '<link rel="canonical" href="https://towers.example/tasks" '
+        'data-dynamic-url="canonical" />'
+    ) in resp.text
+    assert (
+        '<meta property="og:url" content="https://towers.example/tasks" '
+        'data-dynamic-url="canonical" />'
+    ) in resp.text
+    assert (
+        '<meta property="og:image" content="https://towers.example/og-image.png" '
+        'data-dynamic-url="og-image" />'
+    ) in resp.text
+    assert (
+        '<meta name="twitter:image" content="https://towers.example/og-image.png" '
+        'data-dynamic-url="og-image" />'
+    ) in resp.text
+
+    monkeypatch.setenv("LIFE_TOWERS_PUBLIC_URL", "https://public.example/towers")
+    app = create_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="https://internal.example",
+    ) as c:
+        resp = await c.get("/")
+
+    assert resp.status_code == 200
+    assert (
+        '<link rel="canonical" href="https://public.example/towers/" '
+        'data-dynamic-url="canonical" />'
+    ) in resp.text
+    assert (
+        '<meta property="og:image" content="https://public.example/towers/og-image.png" '
+        'data-dynamic-url="og-image" />'
+    ) in resp.text
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +153,21 @@ async def test_register_non_uuidv4_token(client: AsyncClient) -> None:
     v1 = str(uuid.uuid1())
     resp = await client.post("/api/v1/register", json={"token": v1})
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_uuid_inputs_are_canonicalized(client: AsyncClient) -> None:
+    token = make_uuidv4()
+    upper_token = token.upper()
+    register_resp = await client.post("/api/v1/register", json={"token": upper_token})
+    assert register_resp.status_code == 200
+    assert register_resp.json() == {"user_id": token}
+
+    data_resp = await client.get(
+        "/api/v1/data",
+        headers={"Authorization": f"Bearer {upper_token}"},
+    )
+    assert data_resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +219,7 @@ def _make_tree() -> dict:
                         "tag": f"tag-{pi}-{ti}-{bi}",
                         "description": f"desc-{pi}-{ti}-{bi}",
                         "is_done": False,
+                        "difficulty": bi + 1,
                         "created_at": 1700000000 + bi,
                     }
                 )
@@ -199,6 +271,42 @@ async def test_round_trip(client: AsyncClient) -> None:
             for bi, block in enumerate(tower["blocks"]):
                 assert block["id"] == tree["pages"][pi]["towers"][ti]["blocks"][bi]["id"]
                 assert block["tag"] == tree["pages"][pi]["towers"][ti]["blocks"][bi]["tag"]
+                assert (
+                    block["difficulty"]
+                    == tree["pages"][pi]["towers"][ti]["blocks"][bi]["difficulty"]
+                )
+
+
+@pytest.mark.asyncio
+async def test_difficulty_defaults_to_one_when_omitted(client: AsyncClient) -> None:
+    """A block sent without `difficulty` is stored and returned as 1."""
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    tree = _make_tree()
+    # Drop difficulty from the very first block.
+    del tree["pages"][0]["towers"][0]["blocks"][0]["difficulty"]
+
+    put_resp = await client.put("/api/v1/data", json=tree, headers=headers)
+    assert put_resp.status_code == 204
+
+    data = (await client.get("/api/v1/data", headers=headers)).json()
+    assert data["pages"][0]["towers"][0]["blocks"][0]["difficulty"] == 1
+
+
+@pytest.mark.asyncio
+async def test_difficulty_must_be_positive(client: AsyncClient) -> None:
+    """difficulty < 1 is rejected by validation."""
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    tree = _make_tree()
+    tree["pages"][0]["towers"][0]["blocks"][0]["difficulty"] = 0
+
+    resp = await client.put("/api/v1/data", json=tree, headers=headers)
+    assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +326,34 @@ async def test_put_duplicate_page_id(client: AsyncClient) -> None:
 
     resp = await client.put("/api/v1/data", json=tree, headers=headers)
     assert resp.status_code == 400  # pydantic validation error → 400 bad_request per spec
+    assert resp.json() == {"error": "bad_request", "detail": "Validation failed"}
+
+
+@pytest.mark.asyncio
+async def test_put_cross_user_id_conflict_returns_409(client: AsyncClient) -> None:
+    first_token = make_uuidv4()
+    second_token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": first_token})
+    await client.post("/api/v1/register", json={"token": second_token})
+
+    tree = _make_tree()
+    first_resp = await client.put(
+        "/api/v1/data",
+        json=tree,
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+    assert first_resp.status_code == 204
+
+    second_resp = await client.put(
+        "/api/v1/data",
+        json=tree,
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+    assert second_resp.status_code == 409
+    assert second_resp.json() == {
+        "error": "conflict",
+        "detail": "Submitted IDs conflict with existing data",
+    }
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,6 @@
-"""APIRouter with all Life Towers endpoints."""
-
 from __future__ import annotations
 
-import json
+import sqlite3
 import time
 from typing import Annotated
 
@@ -12,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .auth import get_current_user
 from .db import db_connection
 from .limits import limiter
+from .logging import token_log_id
 from .models import (
     BlockOut,
     DataIn,
@@ -53,7 +52,7 @@ async def register(request: Request, body: RegisterRequest) -> RegisterResponse:
                 (now, token),
             )
         conn.commit()
-    logger.info("user_registered", user_id=token, new=existing is None)
+    logger.info("user_registered", user_id=token_log_id(token), new=existing is None)
     return RegisterResponse(user_id=token)
 
 
@@ -94,7 +93,7 @@ async def get_data(
 
                 block_rows = conn.execute(
                     """
-                    SELECT id, tag, description, is_done, created_at
+                    SELECT id, tag, description, is_done, difficulty, created_at
                     FROM blocks
                     WHERE tower_id = ?
                     ORDER BY position
@@ -108,6 +107,7 @@ async def get_data(
                         tag=b["tag"],
                         description=b["description"],
                         is_done=bool(b["is_done"]),
+                        difficulty=b["difficulty"],
                         created_at=b["created_at"],
                     )
                     for b in block_rows
@@ -213,8 +213,9 @@ async def put_data(
                             """
                             INSERT INTO blocks
                                 (id, tower_id, user_id, position, tag,
-                                 description, is_done, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 description, is_done, difficulty,
+                                 created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """,
                             (
                                 block.id,
@@ -224,6 +225,7 @@ async def put_data(
                                 block.tag,
                                 block.description,
                                 1 if block.is_done else 0,
+                                block.difficulty,
                                 created_at,
                                 now,
                             ),
@@ -236,8 +238,14 @@ async def put_data(
             )
 
             conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Submitted IDs conflict with existing data",
+            ) from exc
         except Exception:
             conn.rollback()
             raise
 
-    logger.info("data_replaced", user_id=user_id, pages=len(body.pages))
+    logger.info("data_replaced", user_id=token_log_id(user_id), pages=len(body.pages))

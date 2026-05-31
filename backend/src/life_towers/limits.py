@@ -8,6 +8,8 @@ from fastapi import Request, Response
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from .auth import extract_bearer_token
+
 PAYLOAD_LIMIT_BYTES = 2 * 1024 * 1024  # 2 MiB
 
 _TOO_LARGE_BODY = json.dumps(
@@ -20,12 +22,7 @@ _TOO_LARGE_BODY = json.dumps(
 
 def _get_token_or_ip(request: Request) -> str:
     """Key function for rate limiting: use Bearer token if present, else IP."""
-    auth = request.headers.get("Authorization") or request.headers.get("authorization")
-    if auth:
-        parts = auth.split()
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            return parts[1]
-    return get_remote_address(request)
+    return extract_bearer_token(request) or get_remote_address(request)
 
 
 limiter = Limiter(key_func=_get_token_or_ip, default_limits=[])

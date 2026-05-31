@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import HTTPException, Request
 
 from .db import db_connection
+from .models import _canonical_uuidv4
 
 # Single generic detail used for ALL 401 responses. Per spec, the response
 # must not distinguish between missing / malformed / unknown tokens — that
@@ -21,25 +20,28 @@ def _unauthorized() -> HTTPException:
     )
 
 
-def get_current_user(request: Request) -> str:
-    """Dependency that extracts and validates a Bearer token, returns user_id."""
+def extract_bearer_token(request: Request) -> str | None:
+    """Return the raw Bearer token from the Authorization header, or None."""
     auth_header = request.headers.get("Authorization") or request.headers.get(
         "authorization"
     )
     if not auth_header:
-        raise _unauthorized()
-
+        return None
     parts = auth_header.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise _unauthorized()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return None
 
-    token = parts[1]
+
+def get_current_user(request: Request) -> str:
+    """Dependency that extracts and validates a Bearer token, returns user_id."""
+    token = extract_bearer_token(request)
+    if token is None:
+        raise _unauthorized()
 
     try:
-        u = uuid.UUID(token)
-        if u.version != 4:
-            raise ValueError("Not v4")
-    except (ValueError, AttributeError):
+        token = _canonical_uuidv4(token)
+    except ValueError:
         raise _unauthorized()
 
     with db_connection() as conn:

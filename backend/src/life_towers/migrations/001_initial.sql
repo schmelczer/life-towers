@@ -1,9 +1,7 @@
 -- Life Towers v4 initial schema.
--- SQLite with WAL mode and foreign keys enabled at connection time.
+-- WAL mode, foreign keys, and busy_timeout are applied per-connection in
+-- db._apply_pragmas(), so they are not (and need not be) set here.
 -- All timestamps are unix epoch seconds (INTEGER).
-
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
@@ -17,6 +15,7 @@ CREATE TABLE IF NOT EXISTS pages (
     position                    INTEGER NOT NULL,
     name                        TEXT NOT NULL,
     hide_create_tower_button    INTEGER NOT NULL DEFAULT 0 CHECK (hide_create_tower_button IN (0, 1)),
+    keep_tasks_open             INTEGER NOT NULL DEFAULT 0 CHECK (keep_tasks_open IN (0, 1)),
     default_date_from           INTEGER,
     default_date_to             INTEGER,
     created_at                  INTEGER NOT NULL,
@@ -47,6 +46,7 @@ CREATE TABLE IF NOT EXISTS blocks (
     tag           TEXT NOT NULL DEFAULT '',
     description   TEXT NOT NULL DEFAULT '',
     is_done       INTEGER NOT NULL DEFAULT 0 CHECK (is_done IN (0, 1)),
+    difficulty    INTEGER NOT NULL DEFAULT 1 CHECK (difficulty >= 1),
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL
 ) STRICT;
