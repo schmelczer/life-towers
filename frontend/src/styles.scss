@@ -15,38 +15,6 @@
   src: url('assets/fonts/raleway-400.woff2') format('woff2');
 }
 
-@font-face {
-  font-family: 'Roboto';
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url('assets/fonts/roboto-300.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Roboto';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('assets/fonts/roboto-400.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Roboto';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('assets/fonts/roboto-500.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Material Icons';
-  font-style: normal;
-  font-weight: 400;
-  font-display: block;
-  src: url('assets/fonts/material-icons.woff2') format('woff2');
-}
-
 @import 'library/main';
 
 $line-height: 2px;
@@ -56,7 +24,7 @@ $line-height: 2px;
   padding: 0;
 
   &:active,
-  &:focus {
+  &:focus:not(:focus-visible) {
     outline: 0;
   }
 

@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fffcf0"/><stop offset="1" stop-color="#ffebeb"/></linearGradient>
+  <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a6069"/><stop offset="1" stop-color="#7f4f59"/></linearGradient>
+  <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b07480"/><stop offset="1" stop-color="#9a6069"/></linearGradient>
+  <linearGradient id="b3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c98579"/><stop offset="1" stop-color="#b87672"/></linearGradient>
+  <linearGradient id="b4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2987f"/><stop offset="1" stop-color="#d4836f"/></linearGradient>
+  <filter id="sh" x="-30%" y="-30%" width="160%" height="190%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#5d576b" flood-opacity="0.18"/></filter>
+</defs><rect width="512" height="512" rx="112" fill="url(#bg)"/><g filter="url(#sh)">
+  <rect x="134" y="360" width="244" height="64" rx="18" fill="url(#b1)"/>
+  <rect x="148" y="286" width="216" height="64" rx="18" fill="url(#b2)"/>
+  <rect x="162" y="212" width="188" height="64" rx="18" fill="url(#b3)"/>
+  <g transform="rotate(-7 256 158)"><rect x="176" y="126" width="160" height="64" rx="18" fill="url(#b4)"/></g>
+</g></svg>
