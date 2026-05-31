@@ -1,4 +1,6 @@
-# Life Towers
+<p align="center">
+  <img src="frontend/public/logo.svg" alt="Life Towers" width="420">
+</p>
 
 A personal productivity tool for organising tasks into visual "towers" of blocks, grouped on pages. Each user is identified by a client-generated token — no accounts, no passwords.
 
@@ -21,8 +23,9 @@ Then visit http://localhost:8000.
 For a production-style run, set `LIFE_TOWERS_IMAGE` to point at your registry tag and use the default `docker-compose.yml`:
 
 ```bash
-LIFE_TOWERS_IMAGE=registry.example.com/life-towers:latest \
-  docker compose pull && docker compose up -d
+export LIFE_TOWERS_IMAGE=registry.example.com/life-towers:latest
+docker compose pull
+docker compose up -d
 ```
 
 ## Environment variables
@@ -33,6 +36,7 @@ LIFE_TOWERS_IMAGE=registry.example.com/life-towers:latest \
 | `LIFE_TOWERS_PORT` | `8000` | Host port mapped to the container. |
 | `LIFE_TOWERS_PULL_POLICY` | `missing` | `pull_policy` passed to compose. Set `always` to force-pull on `up`. |
 | `LIFE_TOWERS_ALLOWED_ORIGIN` | _(empty)_ | If set, restricts CORS to this origin. Leave empty for same-origin mode (the typical setup behind nginx). |
+| `LIFE_TOWERS_PUBLIC_URL` | _(derived from request)_ | Absolute public URL used for canonical and Open Graph image tags. Set this when serving behind a path prefix or proxy that rewrites the visible URL. |
 | `LIFE_TOWERS_FORWARDED_ALLOW_IPS` | `*` | (Optional, advanced.) Override uvicorn's `--forwarded-allow-ips` if you want to narrow the set of trusted proxies. |
 
 ## Data persistence
@@ -89,6 +93,6 @@ docker compose -f docker-compose.dev.yml down -v
 
 ## Deployment
 
-Forgejo CI (`.forgejo/workflows/ci.yml`) builds and tests the backend, frontend, and Docker image on every push to `master`. On successful push to `master` it also tags and pushes the image to a registry — configure `REGISTRY_URL`, `REGISTRY_USER`, and `REGISTRY_PASSWORD` as repository secrets.
+Forgejo CI (`.forgejo/workflows/ci.yml`) tests the backend, frontend, production build, and Playwright e2e flow on every push to `master`.
 
-The deploy workflow (`.forgejo/workflows/deploy.yml`) triggers on `workflow_dispatch` or a `v*` tag push. It SSHs into the target server and runs `docker compose pull && docker compose up -d`, then polls the healthcheck. The server must have a `.env` file alongside `docker-compose.yml` that pins `LIFE_TOWERS_IMAGE` to the registry tag pushed by CI — otherwise `docker compose pull` is a no-op against the placeholder `life-towers:local`. Configure `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, and `DEPLOY_PATH` as repository secrets before use.
+The Docker workflow (`.forgejo/workflows/docker.yml`) builds and pushes images tagged `latest` and `sha-<commit>` on pushes to `master` or manual dispatch. It publishes to `vars.REGISTRY` (default `ghcr.io`) under the repository name, using `secrets.GITHUB_TOKEN` for registry auth.
