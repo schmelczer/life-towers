@@ -7,6 +7,7 @@
   @for (tower of page().towers; track tower.id) {
     <lt-tower
       cdkDrag
+      [attr.data-tower-id]="tower.id"
       [cdkDragDisabled]="modalOpen() || mobileDragDisabled()"
       [tower]="tower"
       [dateRange]="dateRange()"

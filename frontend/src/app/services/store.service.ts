@@ -311,7 +311,7 @@ export class StoreService implements OnDestroy {
     if (changed) this.scheduleSave();
   }
 
-  addTower(pageId: string, name: string, base_color: HslColor): void {
+  addTower(pageId: string, name: string, base_color: HslColor): string {
     const tower: Tower = { id: uuidV4(), name, base_color, blocks: [] };
     this._pages.update((pages) =>
       pages.map((p) => (p.id === pageId ? { ...p, towers: [...p.towers, tower] } : p)),
@@ -319,6 +319,7 @@ export class StoreService implements OnDestroy {
     this.analytics.trackStart();
     this.analytics.trackTowerCreated();
     this.scheduleSave();
+    return tower.id;
   }
 
   updateTower(pageId: string, towerId: string, patch: Partial<Omit<Tower, 'id' | 'blocks'>>): void {

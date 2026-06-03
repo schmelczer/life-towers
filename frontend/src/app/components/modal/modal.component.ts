@@ -97,11 +97,21 @@ export class ModalComponent implements AfterViewInit, OnDestroy {
   private readonly dialogRef = viewChild<ElementRef<HTMLElement>>('dialog');
   private previousFocus: HTMLElement | null = null;
   private readonly modalState = inject(ModalStateService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   ngAfterViewInit(): void {
     this.previousFocus = document.activeElement as HTMLElement;
     // Track open state so towers can be locked while any modal is mounted.
     this.modalState.open();
+    // Hoist the modal to <body> so its position:fixed references the viewport.
+    // Tower-level modals (block-edit, tower-settings) are rendered inside the
+    // .towers horizontal scroll container; on iOS Safari a position:fixed
+    // descendant of a scrolling/overflow ancestor is clipped to that ancestor's
+    // box instead of the viewport — cutting off the card's bottom and confining
+    // the backdrop to the towers band (title + sliders show through). Moving the
+    // host out of that ancestor restores true viewport-fixed behaviour. Angular
+    // removes the node via its *current* parent on destroy, so this is safe.
+    document.body.appendChild(this.host.nativeElement);
     // Defer one tick so the opacity transition runs (0 → 1).
     setTimeout(() => this.active.set(true), 0);
   }

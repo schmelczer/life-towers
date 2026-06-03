@@ -68,8 +68,8 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
           tabindex="0"
           [attr.aria-label]="'Focus ' + (editedFor(b.id).tag || 'block')"
           (click)="onCardClick(i + 1)"
-          (keydown.enter)="onCardClick(i + 1)"
-          (keydown.space)="$event.preventDefault(); onCardClick(i + 1)"
+          (keydown.enter)="onCardKey($event, i + 1)"
+          (keydown.space)="onCardKey($event, i + 1)"
         >
           <div class="mask"></div>
 
@@ -151,8 +151,8 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
         tabindex="0"
         aria-label="Focus create card"
         (click)="onCardClick(blocks().length + 1)"
-        (keydown.enter)="onCardClick(blocks().length + 1)"
-        (keydown.space)="$event.preventDefault(); onCardClick(blocks().length + 1)"
+        (keydown.enter)="onCardKey($event, blocks().length + 1)"
+        (keydown.space)="onCardKey($event, blocks().length + 1)"
       >
         <div class="mask"></div>
 
@@ -242,6 +242,12 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
       left: 0;
       right: 0;
       bottom: 0;
+      // Cover the *visible* viewport. Sizing via top:0/bottom:0 uses the layout
+      // viewport, which on mobile extends behind the browser's bottom toolbar
+      // (and the soft keyboard) — so the vertically-centered card gets its
+      // bottom cut off. 100dvh tracks the area that's actually on screen;
+      // browsers without dvh fall back to the top/bottom inset above.
+      height: 100dvh;
       z-index: 10001; // above modal backdrop (10000)
 
       @media (max-height: $min-height) {
@@ -279,6 +285,12 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
 
       @media (max-width: $mobile-width) {
         padding: var(--title-clearance) var(--medium-padding) var(--medium-padding);
+        // Keep the card centered when it fits, but never clip it: 'safe center'
+        // falls back to top-alignment when the card is taller than the visible
+        // viewport, and overflow-y lets the user scroll down to the bottom
+        // (delete/create button) — e.g. when the soft keyboard shrinks the view.
+        align-items: safe center;
+        overflow-y: auto;
       }
 
       @media (max-height: $min-height) {
@@ -788,6 +800,19 @@ export class BlockEditComponent implements AfterViewInit {
     }
   }
 
+  /**
+   * Activate a card via Space/Enter only when the card itself is focused. The
+   * card is a role="button" that wraps the description textarea and the tag
+   * input; without this guard the keydown bubbles up from those fields and the
+   * space handler's preventDefault() swallows the space, making it impossible
+   * to type spaces while editing a block.
+   */
+  onCardKey(event: Event, idx: number): void {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    this.onCardClick(idx);
+  }
+
   /** Close the carousel when the user clicks anywhere that isn't a real card. */
   onBackdropClick(event: MouseEvent): void {
     const target = event.target as HTMLElement | null;
@@ -815,7 +840,12 @@ export class BlockEditComponent implements AfterViewInit {
     if (!card) return;
     const left =
       card.offsetLeft - (container.clientWidth - card.offsetWidth) / 2;
-    container.scrollTo({ left, behavior: smooth ? 'smooth' : 'auto' });
+    // 'instant' (not 'auto') is required: the carousel sets `scroll-behavior:
+    // smooth`, and 'auto' defers to that — so the initial open would *animate*
+    // a scroll across the whole strip to reach the target card (very visible on
+    // mobile, where the carousel can be thousands of px wide). Tap-to-navigate
+    // still passes smooth=true for the nice slide between cards.
+    container.scrollTo({ left, behavior: smooth ? 'smooth' : 'instant' });
     this.activeIdx.set(idx);
   }
 

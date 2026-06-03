@@ -180,4 +180,39 @@ test.describe('Life Towers smoke test', () => {
     });
     await expectTaskListOpen(page, 'Clean up alerts');
   });
+
+  // Regression: opening the block-edit carousel must position the target card
+  // INSTANTLY, not animate a scroll across the whole strip. The carousel sets
+  // `scroll-behavior: smooth`, so scrollTo({behavior:'auto'}) would animate —
+  // very visible on mobile where the strip can be thousands of px wide.
+  test('block-edit carousel opens centered without animating the scroll', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    await expect(page.getByText('Welcome to Life Towers')).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Load sample towers' }).click();
+    await page.waitForSelector('section.modal', { state: 'detached' });
+    // Let the falling animation settle.
+    await page.waitForTimeout(1800);
+
+    // Open the carousel on a done block deep in the strip (the last square).
+    const squares = page.locator('lt-block');
+    await squares.nth(await squares.count() - 1).click();
+    await page.waitForSelector('lt-block-edit .carousel');
+
+    // Sample scrollLeft immediately and a frame later: an animated scroll would
+    // still be moving; an instant jump is already at its final value.
+    const carousel = page.locator('lt-block-edit .carousel');
+    const first = await carousel.evaluate((c: HTMLElement) => c.scrollLeft);
+    await page.waitForTimeout(60);
+    const second = await carousel.evaluate((c: HTMLElement) => c.scrollLeft);
+    expect(Math.abs(second - first)).toBeLessThan(2); // not mid-animation
+
+    // The active card is centered: left/right viewport gaps match within a few px.
+    const gaps = await page.locator('lt-block-edit .card.active').evaluate((el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: window.innerWidth - r.right };
+    });
+    expect(Math.abs(gaps.left - gaps.right)).toBeLessThan(8);
+  });
 });

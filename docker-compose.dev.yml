@@ -9,7 +9,13 @@
 
 services:
   life-towers:
-    build: .
+    build:
+      context: .
+      args:
+        # Strip the PWA service worker from this image so `up --build` always
+        # serves the freshly-built FE assets instead of a stale, SW-cached app
+        # shell. See the SERVICE_WORKER arg in the Dockerfile.
+        SERVICE_WORKER: disabled
     image: life-towers:dev
     ports:
       - "8000:8000"

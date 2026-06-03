@@ -68,6 +68,7 @@ export interface DoubleSliderRange<T> {
       @media (max-width: $mobile-width) {
         max-width: 90vw;
         margin-top: calc(#{$slider-size} / 2);
+        height: 54px;
       }
 
       label { display: none; }
@@ -153,8 +154,8 @@ export interface DoubleSliderRange<T> {
 
         @media (max-width: $mobile-width) {
           font-size: var(--small-font-size);
-          margin-top: $slider-size;
-          span { margin-top: 10px; }
+          margin-top: calc(#{$slider-size} - 12px);
+          span { margin-top: 8px; }
         }
       }
     }

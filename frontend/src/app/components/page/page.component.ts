@@ -9,6 +9,9 @@ import {
   HostListener,
   effect,
   untracked,
+  ElementRef,
+  Injector,
+  afterNextRender,
 } from '@angular/core';
 import { Page } from '../../models';
 import { StoreService } from '../../services/store.service';
@@ -69,6 +72,8 @@ export class PageComponent {
 
   protected readonly store = inject(StoreService);
   private readonly modalState = inject(ModalStateService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   /** True while any lt-modal is mounted — used to lock tower drag. */
   readonly modalOpen = this.modalState.anyOpen;
   readonly mobileDragDisabled = signal(this.isMobileViewport());
@@ -146,7 +151,32 @@ export class PageComponent {
 
   onAddTower(result: TowerSettingsResult): void {
     this.showAddTower.set(false);
-    this.store.addTower(this.page().id, result.name, result.base_color);
+    const towerId = this.store.addTower(this.page().id, result.name, result.base_color);
+    this.centerTowerOnMobile(towerId);
+  }
+
+  /**
+   * On mobile the tower row is a horizontal scroll-snap container. Adding a
+   * tower appends it next to the (far-right) "+" button, so without this the
+   * view stays scrolled on the "+" button rather than the new tower. Center
+   * the freshly-created tower once it's painted. No-op on desktop, where the
+   * row is centered and doesn't scroll.
+   */
+  private centerTowerOnMobile(towerId: string): void {
+    if (!this.isMobileViewport()) return;
+    afterNextRender(
+      () => {
+        const container = this.host.nativeElement.querySelector<HTMLElement>('.towers');
+        const tower = container?.querySelector<HTMLElement>(`[data-tower-id="${towerId}"]`);
+        if (!container || !tower) return;
+        const containerRect = container.getBoundingClientRect();
+        const towerRect = tower.getBoundingClientRect();
+        const delta =
+          towerRect.left + towerRect.width / 2 - (containerRect.left + containerRect.width / 2);
+        container.scrollTo({ left: container.scrollLeft + delta, behavior: 'smooth' });
+      },
+      { injector: this.injector },
+    );
   }
 
   onUpdateTower(towerId: string, result: TowerSettingsResult): void {

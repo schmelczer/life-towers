@@ -39,8 +39,10 @@
 
     .add-tower-wrapper {
       @include center-child();
+
       img.add-tower {
         height: 48px;
+
         @media (max-width: $mobile-width) {
           height: 32px;
         }
@@ -55,7 +57,7 @@
       }
     }
 
-    & > * {
+    &>* {
       width: 100%;
       max-width: 200px;
       box-sizing: border-box;
@@ -69,13 +71,12 @@
     // Mobile: fixed-width towers with horizontal scroll (1.5-column rhythm).
     @media (max-width: $mobile-width) {
       --mobile-tower-width: calc(66vw - var(--small-padding));
-      --mobile-tower-side-padding: max(
-        var(--medium-padding),
-        calc((100% - var(--mobile-tower-width)) / 2)
-      );
+      --mobile-tower-side-padding: max(var(--medium-padding),
+          calc((100% - var(--mobile-tower-width)) / 2));
 
       overflow-x: auto;
-      overflow-y: visible;
+      overflow-y: hidden;
+      touch-action: pan-x;
       -webkit-overflow-scrolling: touch;
       scroll-snap-type: x mandatory;
       scroll-padding-inline: var(--mobile-tower-side-padding);
@@ -89,7 +90,7 @@
         display: none;
       }
 
-      & > * {
+      &>* {
         width: var(--mobile-tower-width) !important;
         max-width: var(--mobile-tower-width) !important;
         min-width: var(--mobile-tower-width) !important;
@@ -102,19 +103,28 @@
   .double-slider-container {
     width: 100%;
     transition: opacity $long-animation-time;
-    @media (max-height: $min-height) { display: none; }
-    &.transparent { opacity: 0; pointer-events: none; }
+
+    @media (max-height: $min-height) {
+      display: none;
+    }
+
+    &.transparent {
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 
   .confirm-delete {
     @include card();
     width: 66vw;
     max-width: 500px;
+
     @media (max-width: $mobile-width) {
       width: 88vw;
       max-width: 88vw;
       padding: var(--medium-padding);
     }
+
     box-sizing: border-box;
     padding: var(--large-padding);
     position: relative;
@@ -124,6 +134,7 @@
 
     .header {
       @include center-child();
+
       .exit {
         position: absolute;
         right: var(--large-padding);
@@ -132,7 +143,9 @@
     }
 
     p {
-      strong { font-weight: bold; }
+      strong {
+        font-weight: bold;
+      }
     }
 
     .confirm-buttons {
@@ -147,13 +160,19 @@
       button.danger {
         color: #b53f3f;
         border-bottom-color: #b53f3f55;
-        &:after { background-color: #b53f3f; }
+
+        &:after {
+          background-color: #b53f3f;
+        }
       }
 
       @media (max-width: $mobile-width) {
         flex-direction: column;
         gap: var(--small-padding);
-        button { width: 100%; }
+
+        button {
+          width: 100%;
+        }
       }
     }
   }
