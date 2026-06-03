@@ -197,7 +197,9 @@ test.describe('Life Towers smoke test', () => {
 
     // Open the carousel on a done block deep in the strip (the last square).
     const squares = page.locator('lt-block');
-    await squares.nth(await squares.count() - 1).click();
+    const squareCount = await squares.count();
+    expect(squareCount).toBeGreaterThan(0); // sample data must have produced done blocks
+    await squares.nth(squareCount - 1).click();
     await page.waitForSelector('lt-block-edit .carousel');
 
     // Sample scrollLeft immediately and a frame later: an animated scroll would

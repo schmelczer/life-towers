@@ -57,7 +57,7 @@
       }
     }
 
-    &>* {
+    & > * {
       width: 100%;
       max-width: 200px;
       box-sizing: border-box;
@@ -71,8 +71,10 @@
     // Mobile: fixed-width towers with horizontal scroll (1.5-column rhythm).
     @media (max-width: $mobile-width) {
       --mobile-tower-width: calc(66vw - var(--small-padding));
-      --mobile-tower-side-padding: max(var(--medium-padding),
-          calc((100% - var(--mobile-tower-width)) / 2));
+      --mobile-tower-side-padding: max(
+        var(--medium-padding),
+        calc((100% - var(--mobile-tower-width)) / 2)
+      );
 
       overflow-x: auto;
       overflow-y: hidden;
@@ -90,7 +92,7 @@
         display: none;
       }
 
-      &>* {
+      & > * {
         width: var(--mobile-tower-width) !important;
         max-width: var(--mobile-tower-width) !important;
         min-width: var(--mobile-tower-width) !important;
