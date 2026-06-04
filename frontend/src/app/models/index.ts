@@ -35,6 +35,12 @@ export interface TreeDto {
   pages: Page[];
 }
 
+/** Response of GET /data: the tree plus the user's current sync revision. */
+export interface DataResponse {
+  pages: Page[];
+  revision: number;
+}
+
 export type SaveStatus =
   | 'idle'
   | 'saving'

@@ -78,6 +78,7 @@ The app is deployed under a path: `https://schmelczer.dev/towers/`. The mechanis
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   }
   ```
+- **SSE (`/api/v1/events`) through nginx**: the endpoint sends `X-Accel-Buffering: no`, which nginx honors to disable response buffering for that stream — so the block above works without a dedicated location. The 20s server-side keepalive comment stays under nginx's default 60s `proxy_read_timeout`, so idle streams don't get culled. If you ever lower `proxy_read_timeout` below ~20s, add `proxy_buffering off;` + a larger read timeout on a `location /towers/api/v1/events`.
 - **Dev/e2e stay at the root**: `docker-compose.dev.yml` builds with the default `BASE_HREF=/`, and Playwright hits `http://life-towers:8000/`. The relative API paths work identically there, so e2e exercises the same code.
 
 ## Build / dev / test / deploy
@@ -174,13 +175,22 @@ Font sizes (`library/text.scss`): `--larger/large/medium/small-font-size` = `22/
 - **No granular endpoints** for individual entity CRUD. Keep it tree-replace.
 - Spec is in `docs/api-spec.md`. Backend pydantic models match it. Frontend `models/index.ts` matches it. Field names are **snake_case** on both sides.
 
+### Multi-client sync (revision + CAS + SSE)
+
+Multiple clients can share one token (same user on phone + laptop). Three pieces keep them in step — see `backend/src/life_towers/events.py`, `api.py`, and `frontend/src/app/{services,utils}`:
+
+- **Per-user `revision`** (`users.revision`, migration `002_revision.sql`): a monotonic counter bumped inside the same `BEGIN IMMEDIATE` as every PUT. `GET /data` returns it; `PUT /data` returns the new one (`{ "revision": N }`, status 200 — **not** 204 anymore).
+- **Compare-and-swap**: the client sends its base revision as the `If-Match` header on PUT. If the stored revision moved underneath it, the server rolls back and returns **409** with `{ "error": "conflict", "revision": <current> }`. Absent `If-Match` ⇒ unguarded write (keeps older cached clients working across a deploy). On 409 the store resolves **server-wins**: it refetches the current server tree and adopts it, discarding this device's un-pushed edit (`store.service.adoptServerData`). The CAS still prevents a stale write from clobbering the other device's data; there is deliberately **no client-side merge** — a conflicting in-flight edit on the losing device is dropped, which is acceptable for a single user across a few devices. (An earlier `utils/sync-merge.ts` 3-way merge was removed in favour of this simpler policy.)
+- **SSE push** (`GET /api/v1/events`, `text/event-stream`): an in-process asyncio pub/sub (`events.py`, single worker — see Dockerfile) pushes the new revision to every live connection right after a PUT commits. The client consumes it with **fetch()+ReadableStream**, not `EventSource`, so the Bearer token rides in a header instead of the URL (`api.service.openEventStream` + `utils/sse.ts` parser). On a newer-revision event the store refetches **only when clean**; if it has pending edits it lets the next PUT's CAS resolve it (server-wins). The stream auto-reconnects with backoff; `switchToken`/`ngOnDestroy` tear it down.
+- **Gotcha**: Starlette's `BaseHTTPMiddleware` is fine with streaming responses, but **httpx's in-memory `ASGITransport` is not** — it can't open a long-lived stream with concurrent requests, so SSE wire behaviour is verified against real uvicorn, not in pytest. Pytest covers the pub/sub bus + that a PUT publishes onto it; `tests/test_api.py` has the pattern.
+
 ### Backend
 
 - All endpoints are inside `APIRouter(prefix="/api/v1")`. Spec drives behavior — if you change a limit, update both spec and code.
 - Migrations: package data under `src/life_towers/migrations/`, loaded via `importlib.resources.files("life_towers").joinpath("migrations")`. The runner tracks applied state in a `schema_migrations(filename TEXT PRIMARY KEY, applied_at INTEGER)` table.
 - All sqlite connections must do `PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000`. The `get_connection()` factory does this.
 - Errors → JSON `{"error": code, "detail": str}` via a single `HTTPException` handler in `main.py`. Stack traces never leak (logged server-side).
-- Rate limits via slowapi: `/register` 30/hour/IP, `GET /data` 60/min/token, `PUT /data` 30/min/token.
+- Rate limits via slowapi: `/register` 30/hour/IP, `GET /data` 60/min/token, `PUT /data` 30/min/token. `GET /events` (SSE) is intentionally **un**-limited — it's one long-lived connection per client.
 
 ## Visual + interaction details that bit me
 

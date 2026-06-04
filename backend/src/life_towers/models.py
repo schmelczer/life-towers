@@ -127,6 +127,14 @@ class DataIn(BaseModel):
 
 class DataOut(BaseModel):
     pages: list[PageOut]
+    # Monotonic per-user version, bumped on every successful PUT. Clients keep
+    # it as their compare-and-swap base and to detect another client's writes.
+    revision: int
+
+
+class PutDataResponse(BaseModel):
+    # The new revision after this write; the client adopts it as its CAS base.
+    revision: int
 
 
 class RegisterRequest(BaseModel):

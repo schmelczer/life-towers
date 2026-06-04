@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator
@@ -198,7 +199,7 @@ async def test_get_data_empty_user(client: AsyncClient) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
-    assert resp.json() == {"pages": []}
+    assert resp.json() == {"pages": [], "revision": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -253,12 +254,14 @@ async def test_round_trip(client: AsyncClient) -> None:
 
     tree = _make_tree()
     put_resp = await client.put("/api/v1/data", json=tree, headers=headers)
-    assert put_resp.status_code == 204
+    assert put_resp.status_code == 200
+    assert put_resp.json() == {"revision": 1}
 
     get_resp = await client.get("/api/v1/data", headers=headers)
     assert get_resp.status_code == 200
     data = get_resp.json()
 
+    assert data["revision"] == 1
     assert len(data["pages"]) == 2
     for pi, page in enumerate(data["pages"]):
         assert page["id"] == tree["pages"][pi]["id"]
@@ -289,7 +292,7 @@ async def test_difficulty_defaults_to_one_when_omitted(client: AsyncClient) -> N
     del tree["pages"][0]["towers"][0]["blocks"][0]["difficulty"]
 
     put_resp = await client.put("/api/v1/data", json=tree, headers=headers)
-    assert put_resp.status_code == 204
+    assert put_resp.status_code == 200
 
     data = (await client.get("/api/v1/data", headers=headers)).json()
     assert data["pages"][0]["towers"][0]["blocks"][0]["difficulty"] == 1
@@ -342,7 +345,7 @@ async def test_put_cross_user_id_conflict_returns_409(client: AsyncClient) -> No
         json=tree,
         headers={"Authorization": f"Bearer {first_token}"},
     )
-    assert first_resp.status_code == 204
+    assert first_resp.status_code == 200
 
     second_resp = await client.put(
         "/api/v1/data",
@@ -455,3 +458,195 @@ async def test_register_rate_limit(client: AsyncClient) -> None:
         resp = await client.post("/api/v1/register", json={"token": make_uuidv4()})
         responses.append(resp.status_code)
     assert responses[-1] == 429, f"Expected 429 on 31st request, got: {responses[-3:]}"
+
+
+# ---------------------------------------------------------------------------
+# Revision counter + compare-and-swap (multi-client sync)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_revision_increments_on_each_put(client: AsyncClient) -> None:
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Fresh user starts at revision 0.
+    assert (await client.get("/api/v1/data", headers=headers)).json()["revision"] == 0
+
+    r1 = await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+    assert r1.json() == {"revision": 1}
+    r2 = await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+    assert r2.json() == {"revision": 2}
+
+    assert (await client.get("/api/v1/data", headers=headers)).json()["revision"] == 2
+
+
+@pytest.mark.asyncio
+async def test_stale_if_match_returns_409_with_current_revision(
+    client: AsyncClient,
+) -> None:
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Base 0 matches a fresh user -> succeeds, revision becomes 1.
+    ok = await client.put(
+        "/api/v1/data", json=_make_tree(), headers={**headers, "If-Match": "0"}
+    )
+    assert ok.status_code == 200
+    assert ok.json() == {"revision": 1}
+
+    # Re-using the now-stale base 0 is rejected; the body carries the truth.
+    stale = await client.put(
+        "/api/v1/data", json=_make_tree(), headers={**headers, "If-Match": "0"}
+    )
+    assert stale.status_code == 409
+    body = stale.json()
+    assert body["error"] == "conflict"
+    assert body["revision"] == 1
+
+    # The conflicting write must NOT have advanced the revision.
+    assert (await client.get("/api/v1/data", headers=headers)).json()["revision"] == 1
+
+    # Retrying with the fresh base succeeds.
+    retry = await client.put(
+        "/api/v1/data", json=_make_tree(), headers={**headers, "If-Match": "1"}
+    )
+    assert retry.status_code == 200
+    assert retry.json() == {"revision": 2}
+
+
+@pytest.mark.asyncio
+async def test_put_without_if_match_skips_the_guard(client: AsyncClient) -> None:
+    """Absent If-Match keeps older cached clients writing (last-writer-wins)."""
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Advance to revision 2 first.
+    await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+    await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+
+    # No If-Match -> write goes through regardless of current revision.
+    resp = await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+    assert resp.status_code == 200
+    assert resp.json() == {"revision": 3}
+
+
+# ---------------------------------------------------------------------------
+# Server-Sent Events stream (notify-to-refetch)
+#
+# The full SSE wire behaviour (incremental flush + live push) is exercised
+# end-to-end against real uvicorn — httpx's in-memory ASGITransport can't model
+# a long-lived streaming response with concurrent requests, so here we cover the
+# two seams it CAN reach reliably: the in-process pub/sub bus, and the fact that
+# a PUT publishes the new revision onto that bus (which the stream then drains).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_event_bus_subscribe_publish_unsubscribe() -> None:
+    from life_towers import events
+
+    user = make_uuidv4()
+    queue = events.subscribe(user)
+    assert events.connection_count(user) == 1
+
+    events.publish(user, 5)
+    assert await asyncio.wait_for(queue.get(), 1) == 5
+
+    events.unsubscribe(user, queue)
+    assert events.connection_count(user) == 0
+
+
+@pytest.mark.asyncio
+async def test_event_bus_coalesces_to_latest_revision() -> None:
+    """A backed-up connection should see only the newest revision, not a queue."""
+    from life_towers import events
+
+    user = make_uuidv4()
+    queue = events.subscribe(user)
+    events.publish(user, 1)
+    events.publish(user, 2)
+    events.publish(user, 3)
+
+    assert await asyncio.wait_for(queue.get(), 1) == 3
+    assert queue.empty()
+    events.unsubscribe(user, queue)
+
+
+@pytest.mark.asyncio
+async def test_event_bus_fans_out_to_all_connections() -> None:
+    from life_towers import events
+
+    user = make_uuidv4()
+    q1 = events.subscribe(user)
+    q2 = events.subscribe(user)
+    assert events.connection_count(user) == 2
+
+    events.publish(user, 7)
+    assert await asyncio.wait_for(q1.get(), 1) == 7
+    assert await asyncio.wait_for(q2.get(), 1) == 7
+
+    events.unsubscribe(user, q1)
+    events.unsubscribe(user, q2)
+    assert events.connection_count(user) == 0
+
+
+@pytest.mark.asyncio
+async def test_event_bus_publish_without_subscribers_is_noop() -> None:
+    from life_towers import events
+
+    events.publish(make_uuidv4(), 99)  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_put_publishes_new_revision_to_subscribers(client: AsyncClient) -> None:
+    """The integration seam: a real PUT must notify a live SSE subscriber."""
+    from life_towers import events
+
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    queue = events.subscribe(token)
+    try:
+        await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+        assert await asyncio.wait_for(queue.get(), 2) == 1
+
+        await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+        assert await asyncio.wait_for(queue.get(), 2) == 2
+    finally:
+        events.unsubscribe(token, queue)
+
+
+@pytest.mark.asyncio
+async def test_rejected_put_does_not_publish(client: AsyncClient) -> None:
+    """A CAS-rejected (409) write must not emit a spurious refetch signal."""
+    from life_towers import events
+
+    token = make_uuidv4()
+    await client.post("/api/v1/register", json={"token": token})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Advance to revision 1.
+    await client.put("/api/v1/data", json=_make_tree(), headers=headers)
+
+    queue = events.subscribe(token)
+    try:
+        # Stale base -> 409, must not publish.
+        stale = await client.put(
+            "/api/v1/data", json=_make_tree(), headers={**headers, "If-Match": "0"}
+        )
+        assert stale.status_code == 409
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(queue.get(), 0.2)
+    finally:
+        events.unsubscribe(token, queue)
+
+
+@pytest.mark.asyncio
+async def test_sse_requires_auth(client: AsyncClient) -> None:
+    # No Bearer token: auth fails before any streaming starts, so a plain GET
+    # returns 401 without holding the connection open.
+    resp = await client.get("/api/v1/events")
+    assert resp.status_code == 401

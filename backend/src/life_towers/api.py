@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import sqlite3
 import time
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
+from . import events
 from .auth import get_current_user
 from .db import db_connection
 from .limits import limiter
@@ -18,6 +22,7 @@ from .models import (
     HealthResponse,
     HslColor,
     PageOut,
+    PutDataResponse,
     RegisterRequest,
     RegisterResponse,
     TowerOut,
@@ -25,6 +30,34 @@ from .models import (
 
 router = APIRouter(prefix="/api/v1")
 logger = structlog.get_logger(__name__)
+
+# How long the SSE loop waits for a new revision before emitting a keepalive
+# comment. Keeps the connection warm through proxies and bounds disconnect
+# detection latency.
+SSE_KEEPALIVE_SECONDS = 20
+
+
+def _read_revision(conn: sqlite3.Connection, user_id: str) -> int:
+    row = conn.execute(
+        "SELECT revision FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    return int(row["revision"]) if row is not None else 0
+
+
+def _parse_if_match(value: str | None) -> int | None:
+    """Parse the client's CAS base revision from the If-Match header.
+
+    Tolerates an ETag-style quoted form (``"5"``). Returns None when the header
+    is absent or unparseable, in which case the write proceeds unguarded
+    (last-writer-wins) — this keeps older cached clients working across a deploy.
+    """
+    if value is None:
+        return None
+    cleaned = value.strip().strip('"')
+    try:
+        return int(cleaned)
+    except ValueError:
+        return None
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -63,6 +96,8 @@ async def get_data(
     user_id: Annotated[str, Depends(get_current_user)],
 ) -> DataOut:
     with db_connection() as conn:
+        revision = _read_revision(conn, user_id)
+
         pages_rows = conn.execute(
             """
             SELECT id, name, hide_create_tower_button, keep_tasks_open, default_date_from, default_date_to
@@ -140,24 +175,44 @@ async def get_data(
                 )
             )
 
-    return DataOut(pages=pages_out)
+    return DataOut(pages=pages_out, revision=revision)
 
 
-@router.put("/data", status_code=204)
+@router.put("/data", response_model=PutDataResponse)
 @limiter.limit("30/minute")
 async def put_data(
     request: Request,
     body: DataIn,
     user_id: Annotated[str, Depends(get_current_user)],
-) -> None:
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> PutDataResponse:
     # Tree-replace semantics mean the request size IS the user's total storage,
     # so the 2 MiB request cap (enforced by payload_size_middleware) is the only
     # quota we need.
     now = int(time.time())
+    base_revision = _parse_if_match(if_match)
 
     with db_connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
         try:
+            current_revision = _read_revision(conn, user_id)
+
+            # Compare-and-swap: reject if another client advanced the revision
+            # under us. The client refetches, merges, and retries with the
+            # fresh base. An absent If-Match opts out of the guard.
+            if base_revision is not None and base_revision != current_revision:
+                conn.rollback()
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "conflict",
+                        "detail": "Revision is stale; refetch and retry",
+                        "revision": current_revision,
+                    },
+                )
+
+            new_revision = current_revision + 1
+
             # Delete existing data for this user (cascades to towers + blocks)
             conn.execute("DELETE FROM pages WHERE user_id = ?", (user_id,))
 
@@ -231,13 +286,16 @@ async def put_data(
                             ),
                         )
 
-            # Update last_seen_at
+            # Bump the revision and refresh last_seen_at in the same transaction.
             conn.execute(
-                "UPDATE users SET last_seen_at = ? WHERE id = ?",
-                (now, user_id),
+                "UPDATE users SET last_seen_at = ?, revision = ? WHERE id = ?",
+                (now, new_revision, user_id),
             )
 
             conn.commit()
+        except HTTPException:
+            # Already rolled back (e.g. the CAS 409); just propagate.
+            raise
         except sqlite3.IntegrityError as exc:
             conn.rollback()
             raise HTTPException(
@@ -248,4 +306,66 @@ async def put_data(
             conn.rollback()
             raise
 
-    logger.info("data_replaced", user_id=token_log_id(user_id), pages=len(body.pages))
+    # Notify other live clients for this user to refetch. Done after commit so
+    # subscribers never observe a revision that isn't durably stored yet.
+    events.publish(user_id, new_revision)
+
+    logger.info(
+        "data_replaced",
+        user_id=token_log_id(user_id),
+        pages=len(body.pages),
+        revision=new_revision,
+    )
+    return PutDataResponse(revision=new_revision)
+
+
+def _format_revision_event(revision: int) -> str:
+    return f"event: revision\ndata: {json.dumps({'revision': revision})}\n\n"
+
+
+@router.get("/events")
+async def events_stream(
+    request: Request,
+    user_id: Annotated[str, Depends(get_current_user)],
+) -> StreamingResponse:
+    """Server-Sent Events stream that notifies a client to refetch.
+
+    Authenticated with the same Bearer token as the rest of the API — clients
+    consume it via fetch()+ReadableStream (EventSource cannot set headers), so
+    the token never leaks into a URL. Each event carries the current revision;
+    the client refetches GET /data when it sees a revision newer than its own.
+    """
+    queue = events.subscribe(user_id)
+
+    async def event_generator():
+        try:
+            # Emit the current revision immediately so a (re)connecting client
+            # can catch up on anything it missed while disconnected.
+            with db_connection() as conn:
+                yield _format_revision_event(_read_revision(conn, user_id))
+
+            while True:
+                try:
+                    revision = await asyncio.wait_for(
+                        queue.get(), timeout=SSE_KEEPALIVE_SECONDS
+                    )
+                    yield _format_revision_event(revision)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    # Comment line: keeps proxies from idling the connection out.
+                    yield ": keepalive\n\n"
+        finally:
+            events.unsubscribe(user_id, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            # Disable nginx response buffering for this stream even if the
+            # location block forgets `proxy_buffering off`.
+            "X-Accel-Buffering": "no",
+        },
+    )

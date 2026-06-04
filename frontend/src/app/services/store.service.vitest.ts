@@ -51,15 +51,33 @@ interface MockApi {
   getData: ReturnType<typeof vi.fn>;
   putData: ReturnType<typeof vi.fn>;
   health: ReturnType<typeof vi.fn>;
+  openEventStream: ReturnType<typeof vi.fn>;
 }
 
 function makeMockApi(): MockApi {
   return {
     health: vi.fn().mockResolvedValue({ status: 'ok' }),
     register: vi.fn().mockResolvedValue({ user_id: 'u' }),
-    getData: vi.fn().mockResolvedValue({ pages: [] } satisfies TreeDto),
-    putData: vi.fn().mockResolvedValue(undefined),
+    getData: vi.fn().mockResolvedValue({ pages: [], revision: 0 }),
+    putData: vi.fn().mockResolvedValue(1),
+    // Returns the stream's close handle; tests override to capture callbacks.
+    openEventStream: vi.fn().mockReturnValue(() => {}),
   };
+}
+
+// Grab the handlers the store last passed to openEventStream so a test can
+// simulate a server push.
+function lastStreamHandlers(api: MockApi): {
+  onRevision: (revision: number) => void;
+  onClosed: () => void;
+} {
+  const calls = api.openEventStream.mock.calls;
+  return calls[calls.length - 1][1];
+}
+
+// Flush awaited promise chains that contain no timers.
+async function flush(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 const FIXED_UUID = '11111111-2222-4333-8444-555555555555';
@@ -672,5 +690,156 @@ describe('StoreService', () => {
 
     expect(store.pages()).toHaveLength(1);
     expect(store.pages()[0].name).toBe('from-other-tab');
+  });
+
+  // ── Multi-client sync: revision + compare-and-swap + SSE ────────────────────
+
+  it('sends the server revision as the PUT base and adopts the returned one', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.getData.mockResolvedValue({ pages: [], revision: 3 });
+    api.putData.mockResolvedValue(4);
+    const store = configure(api);
+    await store.init();
+
+    store.addPage('x');
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenLastCalledWith(FIXED_UUID, expect.anything(), 3);
+
+    // The 4 returned by the first PUT becomes the base of the next one.
+    api.putData.mockResolvedValue(5);
+    store.addPage('y');
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenLastCalledWith(FIXED_UUID, expect.anything(), 4);
+  });
+
+  it('opens an event stream for the token on init', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const store = configure(api);
+    await store.init();
+
+    expect(api.openEventStream).toHaveBeenCalledTimes(1);
+    expect(api.openEventStream.mock.calls[0][0]).toBe(FIXED_UUID);
+  });
+
+  it('refetches and adopts the server tree on a newer-revision SSE event when clean', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.getData.mockResolvedValueOnce({ pages: [], revision: 1 });
+    const store = configure(api);
+    await store.init();
+
+    api.getData.mockResolvedValueOnce({
+      pages: [mkPage('from-other-device')],
+      revision: 5,
+    });
+    lastStreamHandlers(api).onRevision(5);
+    await flush();
+
+    expect(api.getData).toHaveBeenCalledTimes(2);
+    expect(store.pages()).toHaveLength(1);
+    expect(store.pages()[0].name).toBe('from-other-device');
+  });
+
+  it('ignores an SSE event that is not newer than our revision (our own echo)', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.getData.mockResolvedValue({ pages: [], revision: 3 });
+    const store = configure(api);
+    await store.init();
+
+    api.getData.mockClear();
+    lastStreamHandlers(api).onRevision(3);
+    await flush();
+
+    expect(api.getData).not.toHaveBeenCalled();
+  });
+
+  it('defers an SSE refetch while there are pending local edits (CAS handles it)', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.getData.mockResolvedValue({ pages: [], revision: 1 });
+    const store = configure(api);
+    await store.init();
+
+    store.addPage('local'); // now dirty: debounce pending + pending cache
+    api.getData.mockClear();
+    lastStreamHandlers(api).onRevision(9);
+    await flush();
+
+    expect(api.getData).not.toHaveBeenCalled();
+  });
+
+  it('on 409 adopts the server tree (server wins) and discards the local edit', async () => {
+    const PAGE_A = 'aaaaaaaa-1111-4111-8111-111111111111';
+    const PAGE_B = 'bbbbbbbb-2222-4222-8222-222222222222';
+    const pageWith = (id: string, name: string): TreeDto['pages'][number] => ({
+      id,
+      name,
+      hide_create_tower_button: false,
+      keep_tasks_open: false,
+      default_date_from: null,
+      default_date_to: null,
+      towers: [],
+    });
+
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.getData.mockResolvedValueOnce({ pages: [pageWith(PAGE_A, 'A')], revision: 1 });
+    // The PUT is rejected as stale; under server-wins we do NOT retry it.
+    api.putData.mockRejectedValueOnce(httpError(409));
+    // The 409 refetch returns a tree where another device added page B.
+    api.getData.mockResolvedValueOnce({
+      pages: [pageWith(PAGE_A, 'A'), pageWith(PAGE_B, 'from-other-device')],
+      revision: 5,
+    });
+    const store = configure(api);
+    await store.init();
+
+    // Local edit to page A, then save.
+    store.updatePage(PAGE_A, { name: 'A-edited-locally' });
+    await vi.advanceTimersByTimeAsync(750);
+    await vi.runAllTimersAsync();
+
+    const byId = new Map(store.pages().map((p) => [p.id, p.name]));
+    // Server wins: the local edit to A is discarded and the remote tree adopted.
+    expect(byId.get(PAGE_A)).toBe('A');
+    expect(byId.get(PAGE_B)).toBe('from-other-device');
+
+    // The stale PUT fired once and was not retried; the refetched revision (5)
+    // is now our CAS base.
+    expect(api.putData).toHaveBeenCalledTimes(1);
+    expect(store.saveStatus()).toBe('saved');
+  });
+
+  it('closes the event stream on destroy', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const close = vi.fn();
+    api.openEventStream.mockReturnValue(close);
+    const store = configure(api);
+    await store.init();
+
+    store.ngOnDestroy();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the old stream and opens a new one on switchToken', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const closeOld = vi.fn();
+    api.openEventStream.mockReturnValueOnce(closeOld).mockReturnValue(() => {});
+    const store = configure(api);
+    await store.init();
+
+    store.switchToken(OTHER_TOKEN);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(closeOld).toHaveBeenCalledTimes(1);
+    expect(api.openEventStream.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(api.openEventStream.mock.calls[api.openEventStream.mock.calls.length - 1][0]).toBe(
+      OTHER_TOKEN,
+    );
   });
 });

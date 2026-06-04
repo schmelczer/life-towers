@@ -1,13 +1,16 @@
 import { Injectable, inject, signal, OnDestroy } from '@angular/core';
 import { ApiService } from './api.service';
 import { AnalyticsService } from './analytics.service';
-import { Page, Tower, Block, TreeDto, SaveStatus, HslColor } from '../models';
+import { Page, Tower, Block, TreeDto, DataResponse, SaveStatus, HslColor } from '../models';
 
 const TOKEN_KEY = 'life-towers.token.v4';
 const CACHE_KEY_PREFIX = 'life-towers.cache.v4';
 const PENDING_CACHE_KEY_PREFIX = 'life-towers.cache-pending.v4';
 const DEBOUNCE_MS = 750;
 const MAX_RETRIES = 5;
+// SSE reconnect backoff after the stream drops (network blip, server restart).
+const SSE_RECONNECT_BASE_MS = 1000;
+const SSE_RECONNECT_MAX_MS = 30_000;
 
 // RFC 4122 v4 UUID. Prefers crypto.randomUUID (secure contexts only) and
 // falls back to crypto.getRandomValues — which works on plain http origins
@@ -115,6 +118,17 @@ export class StoreService implements OnDestroy {
   // clearing a newer pending cache entry when it completes.
   private localMutationRevision = 0;
 
+  // ── Server revision (compare-and-swap base) ─────────────────────────────────
+  // The revision the server last confirmed for us; sent as the If-Match base on
+  // every PUT and compared against SSE notifications to decide whether to refetch.
+  private serverRevision = 0;
+
+  // ── Live sync (SSE) ─────────────────────────────────────────────────────────
+  private closeEventStream: (() => void) | null = null;
+  private eventStreamToken = '';
+  private sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private sseReconnectAttempts = 0;
+
   // ── Cross-tab sync ─────────────────────────────────────────────────────────
   private readonly storageListener = (e: StorageEvent) => {
     if (e.key === TOKEN_KEY && e.newValue && e.newValue !== this._token()) {
@@ -196,6 +210,12 @@ export class StoreService implements OnDestroy {
       if (this.initGeneration === generation) {
         this._loading.set(false);
       }
+      // Subscribe to live updates for this token. Started even if the data load
+      // failed (we'll have fallen back to cache) — the stream self-heals when
+      // connectivity returns and its first event triggers a refetch.
+      if (this.isCurrentInit(generation, token)) {
+        this.startEventStream(token);
+      }
     }
   }
 
@@ -207,8 +227,13 @@ export class StoreService implements OnDestroy {
    * Apply a freshly-fetched server tree. If the server is empty but our local
    * cache holds data, the cache wins and we schedule a push — otherwise the
    * "server forgot me" recovery would silently wipe offline edits.
+   *
+   * The server's revision becomes our CAS base regardless of which view we
+   * display: even when the cache wins, the next PUT is guarded against it.
    */
-  private adoptServerTree(tree: TreeDto, token: string): void {
+  private adoptServerTree(data: DataResponse, token: string): void {
+    this.setServerRevision(data, token);
+
     if (safeGet(pendingCacheKeyForToken(token))) {
       const cachedTree = this.readCachedTree(token);
       if (cachedTree?.pages && cachedTree.pages.length > 0) {
@@ -218,7 +243,7 @@ export class StoreService implements OnDestroy {
       }
     }
 
-    if (tree.pages.length === 0) {
+    if (data.pages.length === 0) {
       const cachedTree = this.readCachedTree(token);
       if (cachedTree?.pages && cachedTree.pages.length > 0) {
         this._pages.set(cachedTree.pages);
@@ -226,8 +251,14 @@ export class StoreService implements OnDestroy {
         return;
       }
     }
-    this._pages.set(tree.pages);
-    this.updateCache(token, tree);
+    this._pages.set(data.pages);
+    this.updateCache(token, { pages: data.pages });
+  }
+
+  /** Record the server's revision as our compare-and-swap base. */
+  private setServerRevision(data: DataResponse, token: string): void {
+    if (this._token() !== token) return;
+    this.serverRevision = data.revision ?? 0;
   }
 
   private loadFromCache(token: string): void {
@@ -481,6 +512,9 @@ export class StoreService implements OnDestroy {
     const token = newToken.toLowerCase();
     if (!isUuidV4(token)) return;
     this.cancelPendingWrites();
+    // Tear down the old account's live stream before init() opens a new one.
+    this.stopEventStream();
+    this.sseReconnectAttempts = 0;
     this.initGeneration++;
     this.initPromise = null;
     safeSet(TOKEN_KEY, token);
@@ -489,6 +523,7 @@ export class StoreService implements OnDestroy {
     this._loading.set(true);
     this._saveStatus.set('idle');
     this.localMutationRevision = 0;
+    this.serverRevision = 0;
     void this.init();
   }
 
@@ -549,14 +584,17 @@ export class StoreService implements OnDestroy {
   private async attempt(put: PendingPut, attempt: number): Promise<void> {
     this._saveStatus.set(attempt === 0 ? 'saving' : 'retrying');
     try {
-      await this.api.putData(put.token, put.tree);
+      const newRevision = await this.api.putData(put.token, put.tree, this.serverRevision);
       this._saveStatus.set('saved');
-      if (
-        this._token() === put.token &&
-        put.revision === this.localMutationRevision &&
-        !this.dirtyDuringFlush
-      ) {
-        this.updateCache(put.token, put.tree);
+      if (this._token() === put.token) {
+        // A successful write advances the revision by exactly one, so fall back
+        // to that if the response didn't carry a number.
+        this.serverRevision = Number.isFinite(newRevision)
+          ? newRevision
+          : this.serverRevision + 1;
+        if (put.revision === this.localMutationRevision && !this.dirtyDuringFlush) {
+          this.updateCache(put.token, put.tree);
+        }
       }
       return;
     } catch (err: unknown) {
@@ -571,6 +609,24 @@ export class StoreService implements OnDestroy {
       if (status === 413) {
         this._saveStatus.set('too-large');
         return;
+      }
+
+      // 409: another client wrote since our base revision. Resolve server-wins —
+      // refetch the current server tree and adopt it, discarding this device's
+      // un-pushed edit. The CAS still prevents a stale write from clobbering the
+      // other device's data; we just don't merge the two views.
+      if (status === 409) {
+        this._saveStatus.set('retrying');
+        try {
+          const remote = await this.api.getData(put.token);
+          if (this._token() !== put.token) return;
+          this.adoptServerData(remote, put.token);
+          this._saveStatus.set('saved');
+          return;
+        } catch {
+          // Couldn't refetch (network); fall through to backoff and retry the
+          // PUT, which will 409 again and re-attempt the refetch.
+        }
       }
 
       // 401 mid-PUT: server forgot us. Re-register (idempotent) and retry.
@@ -617,6 +673,101 @@ export class StoreService implements OnDestroy {
         attempt + 1,
       );
     }
+  }
+
+  // ── Live sync (SSE) ─────────────────────────────────────────────────────────
+
+  private startEventStream(token: string): void {
+    if (typeof window === 'undefined') return;
+    if (this.eventStreamToken === token && this.closeEventStream) return;
+    this.stopEventStream();
+    this.eventStreamToken = token;
+    this.closeEventStream = this.api.openEventStream(token, {
+      onRevision: (revision) => this.onRemoteRevision(token, revision),
+      onClosed: () => this.onEventStreamClosed(token),
+    });
+  }
+
+  private onRemoteRevision(token: string, revision: number): void {
+    if (this._token() !== token) return;
+    // A delivered event proves the stream works — reset the reconnect backoff.
+    this.sseReconnectAttempts = 0;
+    // Our own echo, or an out-of-order/stale frame: nothing new to pull.
+    if (revision <= this.serverRevision) return;
+    // If a save is pending/in-flight its compare-and-swap will reconcile via a
+    // 409; refetching now would race it. Only adopt when we're clean.
+    if (this.hasPendingWork()) return;
+    void this.pullFromRemote(token);
+  }
+
+  private onEventStreamClosed(token: string): void {
+    this.closeEventStream = null;
+    this.eventStreamToken = '';
+    if (this._token() !== token) return;
+    if (this.sseReconnectTimer !== null) clearTimeout(this.sseReconnectTimer);
+    const delay = Math.min(
+      SSE_RECONNECT_BASE_MS * 2 ** this.sseReconnectAttempts,
+      SSE_RECONNECT_MAX_MS,
+    );
+    this.sseReconnectAttempts += 1;
+    this.sseReconnectTimer = setTimeout(() => {
+      this.sseReconnectTimer = null;
+      if (this._token() === token) this.startEventStream(token);
+    }, delay);
+  }
+
+  private stopEventStream(): void {
+    if (this.sseReconnectTimer !== null) {
+      clearTimeout(this.sseReconnectTimer);
+      this.sseReconnectTimer = null;
+    }
+    if (this.closeEventStream) {
+      this.closeEventStream();
+      this.closeEventStream = null;
+    }
+    this.eventStreamToken = '';
+  }
+
+  /**
+   * Pull the server tree after a remote-change notification. Reached only when
+   * we're clean, so the server is authoritative and we adopt it wholesale —
+   * unless the user starts editing during the fetch, in which case we back off
+   * and let the next save's compare-and-swap reconcile (so the edit survives).
+   */
+  private async pullFromRemote(token: string): Promise<void> {
+    if (this.hasPendingWork()) return;
+    let remote: DataResponse;
+    try {
+      remote = await this.api.getData(token);
+    } catch {
+      return; // transient; a later event or reconnect retries
+    }
+    if (this._token() !== token) return;
+    if (this.hasPendingWork()) return; // edited mid-fetch → defer to CAS
+    this.adoptServerData(remote, token);
+  }
+
+  /**
+   * Adopt a server tree as the new truth. Used both when a clean client pulls a
+   * remote change (nothing local to lose) and on the 409 server-wins path (any
+   * un-pushed local edit on this device is intentionally discarded).
+   */
+  private adoptServerData(data: DataResponse, token: string): void {
+    if (this._token() !== token) return;
+    this.setServerRevision(data, token);
+    this._pages.set(data.pages);
+    this.updateCache(token, { pages: data.pages });
+  }
+
+  /** True while any local change is unsaved, being saved, or awaiting retry. */
+  private hasPendingWork(): boolean {
+    return (
+      this.debounceTimer !== null ||
+      this.retryTimer !== null ||
+      this.flushInFlight ||
+      this.dirtyDuringFlush ||
+      !!safeGet(pendingCacheKeyForToken(this._token()))
+    );
   }
 
   // ── Example data ──────────────────────────────────────────────────────────
@@ -745,6 +896,7 @@ export class StoreService implements OnDestroy {
 
   ngOnDestroy(): void {
     this.cancelPendingWrites();
+    this.stopEventStream();
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', this.storageListener);
     }
