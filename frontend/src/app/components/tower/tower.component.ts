@@ -339,18 +339,19 @@ export function selectVisibleStyledBlocks(
             flex: 0 1 auto;
             min-height: 56px;
             max-height: min(30vh, 45%);
-            overflow: auto;
-            display: block;
+            // The host only bounds the accordion's height and CLIPS — it must
+            // not scroll. Scrolling lives solely on the inner card
+            // (tasks.component .container), so a tall task list shows ONE
+            // scrollbar (inside the card), not two. Flex column + the card's
+            // min-height: 0 lets the card shrink to this bound and scroll.
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
             width: 100%;
 
             @media (max-width: $mobile-width) {
               min-height: 44px;
               max-height: min(25vh, 45%);
-            }
-
-            .container {
-              max-height: 100%;
-              overflow-y: auto;
             }
           }
 

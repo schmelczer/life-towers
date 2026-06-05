@@ -105,7 +105,12 @@ export function taskListMaxHeight(expanded: boolean): string {
         padding: calc(var(--small-padding) / 2);
         margin: calc(var(--small-padding) / 2);
 
-        max-height: 30vh;
+        // Height is bounded by the host (lt-tasks) flex column, which clips but
+        // does not scroll. As the sole scroller, this card shrinks to that
+        // bound (min-height: 0) and scrolls a tall list inside itself — one
+        // scrollbar, sitting within the white card.
+        flex: 0 1 auto;
+        min-height: 0;
         overflow-y: auto;
 
         .header {

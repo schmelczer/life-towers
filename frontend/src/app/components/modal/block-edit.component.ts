@@ -187,6 +187,7 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
           maxlength="10000"
           [value]="newValue().description"
           (input)="updateNewDescription($any($event.target).value)"
+          (keydown.enter)="onNewDescriptionEnter($event)"
         ></textarea>
 
         <label class="done-checkbox">
@@ -412,6 +413,13 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
           box-shadow: 0 0 0 0.75px rgba(181, 63, 63, 0.5);
           border-radius: var(--border-radius);
         }
+      }
+
+      textarea {
+        // The global reset (styles.scss) zeroes padding, so the focus outline
+        // hugs the text. Re-pad so the outline clears the description text.
+        // box-sizing: border-box (forms.scss) keeps the outer size unchanged.
+        padding: 6px 8px;
       }
 
       .done-checkbox {
@@ -777,6 +785,18 @@ export class BlockEditComponent implements AfterViewInit {
 
   updateNewDifficulty(delta: number): void {
     this.newValue.update((v) => ({ ...v, difficulty: clampDifficulty(v.difficulty + delta) }));
+  }
+
+  /**
+   * Bare Enter in the create-card description submits the new task and exits.
+   * Angular's `keydown.enter` pseudo-event matches *only* unmodified Enter, so
+   * Ctrl+Enter / Shift+Enter never reach here — they fall through to the
+   * textarea's default behaviour and insert a newline.
+   */
+  onNewDescriptionEnter(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.submitNew();
   }
 
   submitNew(): void {
