@@ -33,7 +33,12 @@ export function editEntryForNewBlock(keepTasksOpen: boolean): EditEntry {
   };
 }
 
-/** A done block augmented with per-render animation state. */
+/** A done block augmented with per-render animation state.
+ *  - `ascend`: flying up and out past the upper date bound (CSS transition).
+ *  - `descend`: a CSS transition back DOWN to rest, used only when an already
+ *    rendered block re-enters range as the date slider widens. A brand-new
+ *    block's "fall" is played imperatively via the Web Animations API instead
+ *    (see `playFall`) — a fresh element can't CSS-transition from off-screen. */
 export interface StyledBlock extends Block {
   _anim: '' | 'descend' | 'ascend';
   _transform: string;
@@ -115,6 +120,33 @@ export function selectVisibleStyledBlocks(
     hiddenCount,
     visibleStyled: styled.filter((b) => shownIds.has(b.id)),
   };
+}
+
+/**
+ * Decide which visible blocks should play the gravity "fall" this reconcile.
+ *
+ * The two guarantees the user asked for live here:
+ *   - **No fall on page load.** The very first render of a tower's stack never
+ *     animates (`firstRender` ⇒ []), except the deliberate example showcase.
+ *   - **Always fall on add / tick.** After that first render, any block whose id
+ *     is genuinely new this round (a ticked task, an added done block, or a
+ *     remote add picked up over SSE) and is currently resting & visible falls.
+ *
+ * Date-range reshuffles never appear here: a block re-entering range keeps its
+ * id (so it isn't "new"), and blocks flying out aren't resting (`restingVisibleIds`
+ * only holds opacity-1 blocks).
+ */
+export function decideFalls(opts: {
+  firstRender: boolean;
+  animateInitialStack: boolean;
+  newIds: readonly string[];
+  restingVisibleIds: ReadonlySet<string>;
+}): string[] {
+  const { firstRender, animateInitialStack, newIds, restingVisibleIds } = opts;
+  if (firstRender) {
+    return animateInitialStack ? [...restingVisibleIds] : [];
+  }
+  return newIds.filter((id) => restingVisibleIds.has(id));
 }
 
 @Component({
@@ -209,6 +241,7 @@ export function selectVisibleStyledBlocks(
           [blocks]="filteredForEntry()"
           [activeBlockId]="entry.activeId"
           [tags]="towerTags()"
+          [lastTag]="lastBlockTag()"
           [baseColor]="tower().base_color"
           [defaultDone]="entry.filter === 'done'"
           (save)="onBlockSave($event)"
@@ -413,6 +446,10 @@ export function selectVisibleStyledBlocks(
                   transform: translateY(500%);
                 }
 
+                /* A block re-entering range (slider widened) glides back down to
+                   rest. Brand-new blocks fall via the Web Animations API, not
+                   this transition — a freshly inserted element has no prior
+                   value to transition from. */
                 .descend {
                   transition: transform 1.5s cubic-bezier(0.5, 0, 1, 0),
                               opacity 500ms cubic-bezier(0.5, 0, 1, 0);
@@ -584,11 +621,22 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
     return [...set];
   });
 
+  /** Tag of the most recently added block (blocks are appended on create, and
+   *  that order round-trips through the backend's `position` columns). The
+   *  create card pre-selects it so repeated adds keep the same category. */
+  readonly lastBlockTag = computed(() => {
+    const blocks = this.tower().blocks;
+    return blocks.length > 0 ? blocks[blocks.length - 1].tag : '';
+  });
+
   // ── Falling animation ──────────────────────────────────────────────────────
-  // Same approach as the legacy: detect "exactly one done block was added"
-  // and snap that last block to translateY(500%)/opacity:0, then on next
-  // tick flip it back to translateY(0)/opacity:1 with .descend so the
-  // 1.5s gravity transition fires.
+  // Render done blocks at their RESTING position, then — only for blocks that
+  // genuinely arrived this round (a ticked task, a new done block, or a remote
+  // add over SSE) — play the gravity "fall" imperatively with the Web Animations
+  // API (`playFall`). Doing it imperatively makes the fall deterministic: it no
+  // longer depends on a CSS class flip landing across two animation frames of
+  // zoneless change detection, which used to drop the fall (block just appears)
+  // or fire it on load. The first time the stack renders, nothing falls.
 
   private readonly _visibleBlocks = signal<StyledBlock[]>([]);
   readonly visibleBlocks = this._visibleBlocks.asReadonly();
@@ -613,8 +661,12 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
     return rows === 0 ? '0px' : `${Number(cqw.toFixed(4))}cqw`;
   });
 
-  private prevDoneIds: string[] = [];
-  private isFirstRun = true;
+  /** Done-block ids present at the previous reconcile — diffed to find arrivals. */
+  private prevDoneIds = new Set<string>();
+  /** False until the stack has been rendered once; gates "no fall on load". */
+  private hasRenderedStack = false;
+  /** WAAPI fall animations in flight; cancelled on destroy. */
+  private readonly runningAnimations = new Set<Animation>();
 
   constructor() {
     effect(() => {
@@ -648,6 +700,8 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
     this.destroyed = true;
     for (const id of this.animationFrames) cancelAnimationFrame(id);
     this.animationFrames.clear();
+    for (const anim of this.runningAnimations) anim.cancel();
+    this.runningAnimations.clear();
     this.resizeObserver?.disconnect();
   }
 
@@ -700,109 +754,138 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
     maxVisibleBlocks: number | null,
     animateInitialStack: boolean,
   ): void {
-    if (this.isFirstRun && animateInitialStack && maxVisibleBlocks === null) {
+    const ids = allDone.map((b) => b.id);
+    const idSet = new Set(ids);
+    const firstRender = !this.hasRenderedStack;
+    const newIds = ids.filter((id) => !this.prevDoneIds.has(id));
+
+    // Build the styled list: in-range blocks rest at the bottom; blocks past the
+    // upper date bound fly up and out (declarative `.ascend` transition); blocks
+    // below the lower bound drop out of the list instantly. In-range blocks carry
+    // `.descend` so an already-rendered block re-entering range (slider widened)
+    // glides back down; it's inert for fresh elements (which fall via WAAPI).
+    const styled: StyledBlock[] = [];
+    for (const b of allDone) {
+      if (range && b.created_at < range.from) continue;
+      if (range && b.created_at > range.to) {
+        styled.push({ ...b, _anim: 'ascend', _transform: 'translateY(500%)', _opacity: '0' });
+        continue;
+      }
+      styled.push({ ...b, _anim: 'descend', _transform: 'translateY(0)', _opacity: '1' });
+    }
+
+    // The example showcase wants its whole stack to fall in on first paint, but
+    // it can only pick the right (capped) blocks once the tower is measured.
+    // Until then render nothing and wait — WITHOUT marking the stack rendered, so
+    // the post-measurement run still triggers the showcase fall on the right set
+    // (and the blocks fall in clean, never flashing at rest first).
+    if (firstRender && animateInitialStack && maxVisibleBlocks === null) {
       this._visibleBlocks.set([]);
       this.hiddenBlockCount.set(0);
-      this.prevDoneIds = allDone.map((b) => b.id);
-      this.isFirstRun = false;
+      this.prevDoneIds = idSet;
       return;
     }
 
-    const ids = allDone.map((b) => b.id);
-    const prev = this.prevDoneIds;
-    const prevSet = new Set(prev);
-    const newIds = ids.filter((id) => !prevSet.has(id));
-    const grewByOne =
-      !this.isFirstRun &&
-      ids.length === prev.length + 1 &&
-      newIds.length === 1 &&
-      prev.every((id) => ids.includes(id)); // no IDs disappeared
-
-    const styled: StyledBlock[] = [];
-    for (const b of allDone) {
-      if (range && b.created_at < range.from) {
-        // Below min-thumb boundary → drop entirely (instant shuffle, no animation).
-        continue;
-      }
-      if (range && b.created_at > range.to) {
-        // Above max-thumb boundary → fly up off the tower with gravity animation.
-        styled.push({
-          ...b,
-          _anim: 'ascend',
-          _transform: 'translateY(500%)',
-          _opacity: '0',
-        });
-        continue;
-      }
-      // In range — descend into position (or appear instantly on first run).
-      styled.push({
-        ...b,
-        _anim: this.isFirstRun ? '' : 'descend',
-        _transform: 'translateY(0)',
-        _opacity: '1',
-      });
-    }
-
-    const newInRangeId = grewByOne ? newIds[0] : null;
-    // Captured before any `_visibleBlocks.set` below — lets the cap keep
+    // Reserve a visible slot for the newest just-added block so a capped stack
+    // still shows (and can fall) it.
+    const reserveId = !firstRender && newIds.length > 0 ? newIds[newIds.length - 1] : null;
+    // Captured before the `_visibleBlocks.set` below — lets the cap keep
     // currently-shown blocks that are now flying out so their exit animates.
     const prevVisibleIds = new Set(this._visibleBlocks().map((b) => b.id));
-    const visibleLimit =
-      maxVisibleBlocks === null ? Number.POSITIVE_INFINITY : Math.max(0, maxVisibleBlocks);
-    let visibleStyled = styled;
-    let hiddenCount = 0;
-    if (Number.isFinite(visibleLimit)) {
-      ({ visibleStyled, hiddenCount } = selectVisibleStyledBlocks(
-        styled,
-        visibleLimit,
-        newInRangeId,
-        prevVisibleIds,
-      ));
-    }
+    const { visibleStyled, hiddenCount } = this.capStyled(
+      styled,
+      maxVisibleBlocks,
+      reserveId,
+      prevVisibleIds,
+    );
+    this._visibleBlocks.set(visibleStyled);
     this.hiddenBlockCount.set(hiddenCount);
 
-    if (this.isFirstRun && animateInitialStack) {
-      const initialBlocks = visibleStyled.filter((b) => b._opacity === '1');
-      if (initialBlocks.length > 0) {
-        this.startDescendAnimation(visibleStyled, initialBlocks);
-        this.prevDoneIds = ids;
-        this.isFirstRun = false;
-        return;
-      }
-    }
+    const restingVisibleIds = new Set(
+      visibleStyled.filter((b) => b._opacity === '1').map((b) => b.id),
+    );
 
-    if (grewByOne) {
-      const newId = newIds[0];
-      const newBlock = visibleStyled.find((b) => b.id === newId);
-      if (newBlock) {
-        // Snap newly-added in-range block to start position, then on the next
-        // paint flip it back to rest — that's what makes it visibly fall.
-        this.startDescendAnimation(visibleStyled, [newBlock]);
-        this.prevDoneIds = ids;
-        this.isFirstRun = false;
-        return;
-      }
-    }
-    // existing fall-through path (no growth, first run, or new block out of range):
-    this._visibleBlocks.set(visibleStyled);
+    const toFall = decideFalls({ firstRender, animateInitialStack, newIds, restingVisibleIds });
 
-    this.prevDoneIds = ids;
-    this.isFirstRun = false;
+    this.prevDoneIds = idSet;
+    this.hasRenderedStack = true;
+
+    if (toFall.length > 0) this.scheduleFall(toFall);
   }
 
-  private startDescendAnimation(visibleStyled: StyledBlock[], blocks: StyledBlock[]): void {
-    for (const block of blocks) {
-      block._anim = '';
-      block._transform = 'translateY(500%)';
-      block._opacity = '0';
+  /** Cap the styled stack to the measured square budget (or pass it through
+   *  untouched while still unmeasured). */
+  private capStyled(
+    styled: StyledBlock[],
+    maxVisibleBlocks: number | null,
+    reserveId: string | null,
+    prevVisibleIds: ReadonlySet<string> = new Set(),
+  ): { visibleStyled: StyledBlock[]; hiddenCount: number } {
+    if (maxVisibleBlocks === null) {
+      return { visibleStyled: styled, hiddenCount: 0 };
     }
-    this._visibleBlocks.set(visibleStyled);
+    return selectVisibleStyledBlocks(
+      styled,
+      Math.max(0, maxVisibleBlocks),
+      reserveId,
+      prevVisibleIds,
+    );
+  }
+
+  /**
+   * Play the gravity "fall" on the given blocks' square elements via the Web
+   * Animations API, after they've rendered at their resting position. WAAPI
+   * animates the elements in from above on the next frame regardless of
+   * change-detection timing, so the fall always fires (the old approach flipped
+   * a CSS class across two rAFs and would intermittently drop the animation).
+   */
+  private scheduleFall(blockIds: string[], attempt = 0): void {
     this.requestFrame(() => {
-      this.requestFrame(() => {
-        if (this.destroyed) return;
-        this.finishDescendAnimation(blocks);
-      });
+      if (this.destroyed) return;
+      const zone = this.stackZone()?.nativeElement;
+      if (!zone) return;
+      const pending: string[] = [];
+      for (const id of blockIds) {
+        const selector = `lt-block[data-block-id="${this.cssEscape(id)}"]`;
+        const els = zone.querySelectorAll<HTMLElement>(selector);
+        if (els.length === 0) {
+          // The block hasn't rendered yet (change detection can land a frame
+          // late); retry a couple of frames before giving up.
+          pending.push(id);
+          continue;
+        }
+        els.forEach((el) => this.playFall(el));
+      }
+      if (pending.length > 0 && attempt < 3) this.scheduleFall(pending, attempt + 1);
     });
+  }
+
+  private playFall(el: HTMLElement): void {
+    if (typeof el.animate !== 'function') return;
+    // `fill: 'backwards'` holds the off-screen start frame until the animation
+    // begins, so the block never flashes at rest first; once it ends the element
+    // reverts to its committed resting style (no snap-back needed). Opacity fades
+    // in over the first third, matching the legacy descend transition.
+    const transformAnim = el.animate(
+      [{ transform: 'translateY(500%)' }, { transform: 'translateY(0)' }],
+      { duration: 1500, easing: 'cubic-bezier(0.5, 0, 1, 0)', fill: 'backwards' },
+    );
+    const opacityAnim = el.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 500, easing: 'cubic-bezier(0.5, 0, 1, 0)', fill: 'backwards' },
+    );
+    for (const anim of [transformAnim, opacityAnim]) {
+      this.runningAnimations.add(anim);
+      const drop = () => this.runningAnimations.delete(anim);
+      anim.finished.then(drop, drop);
+    }
+  }
+
+  private cssEscape(value: string): string {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      return CSS.escape(value);
+    }
+    return value.replace(/["\\]/g, '\\$&');
   }
 
   private requestFrame(callback: () => void): void {
@@ -815,15 +898,6 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
       if (!this.destroyed) callback();
     });
     this.animationFrames.add(id);
-  }
-
-  private finishDescendAnimation(blocks: StyledBlock[]): void {
-    for (const block of blocks) {
-      block._anim = 'descend';
-      block._transform = 'translateY(0)';
-      block._opacity = '1';
-    }
-    this._visibleBlocks.set([...this._visibleBlocks()]);
   }
 
   // ── Event handlers ─────────────────────────────────────────────────────────

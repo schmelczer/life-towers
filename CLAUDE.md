@@ -198,14 +198,13 @@ Multiple clients can share one token (same user on phone + laptop). Three pieces
 
 The `.block-container` has `transform: scaleY(-1)` so blocks visually fall from the TOP into the bottom of the tower. Each block default-positions at `translateY(500%)` via a `*` rule; the inline `[style.transform]="b._transform"` binding overrides per-block.
 
-When exactly **one** new done block is added, the `reconcile()` method:
-1. Sets the new block's `_transform: 'translateY(500%)'` and `_opacity: '0'` (off-screen)
-2. Calls `requestAnimationFrame` → `requestAnimationFrame` to let the browser paint the initial state
-3. Sets `_anim: 'descend'`, `_transform: 'translateY(0)'`, `_opacity: '1'` — the CSS transition fires
+`reconcile()` renders done blocks at their **resting** position, then decides what should fall via the pure, unit-tested `decideFalls()` helper. Two guarantees:
+- **No fall on page load.** A `hasRenderedStack` flag gates the very first render of a tower's stack: it never animates (blocks just appear at rest). Only the deliberate "Try an example" showcase (`animateInitialStack`) falls its whole initial stack. Do NOT key "first render" off effect-run ordering vs `ngAfterViewInit` measurement — that was non-deterministic and caused intermittent load-falls.
+- **Always fall on add / tick.** After the first render, any done-block id that's genuinely new this round (set-difference vs `prevDoneIds`) and is currently resting & visible falls.
 
-**Critical**: `grewByOne` detection is position-independent (set-difference). When a tickbox flips a pending block to done, the new entry inserts at its original `tower.blocks` index, not appended. Use the new ID, not `styled[length-1]`.
+The fall itself is played **imperatively via the Web Animations API** (`playFall`): the block is already rendered at rest, and WAAPI animates it in from `translateY(500%)`/`opacity:0` on the next frame (`fill: 'backwards'` so it never flashes at rest first). This is deterministic — the old approach snapped the block to `500%` then flipped it back with a `.descend` CSS transition across a double-`requestAnimationFrame`, which raced zoneless change detection and would intermittently drop the fall (block just appears) or misfire on load. **WAAPI is the right tool for block animations here precisely because it's immune to CD timing.**
 
-The **date range** slider asymmetry: blocks below `range.from` are removed from `visibleBlocks` entirely (instant shuffle, no gap), blocks above `range.to` get `_anim: 'ascend'` and stay in the list flying up. `prevDoneIds` tracks the full `allDone` array — not the filtered styled list — so range expansions don't mis-fire as "new block".
+The **date range** slider asymmetry: blocks below `range.from` are removed from `visibleBlocks` entirely (instant shuffle, no gap), blocks above `range.to` get `_anim: 'ascend'` and stay in the list flying up. The `.descend` CSS class survives **only** for the reverse case — an already-rendered block re-entering range as the slider widens glides back down (a real in-DOM transform change, so CSS transitions reliably; no WAAPI needed). `prevDoneIds` tracks the full `allDone` id set — not the filtered styled list — so range reshuffles keep the same ids and never mis-fire as "new block".
 
 ### Block-edit carousel (modal/block-edit.component)
 

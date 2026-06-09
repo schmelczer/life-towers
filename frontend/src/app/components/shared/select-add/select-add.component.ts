@@ -18,6 +18,7 @@ import {
       class="container"
       [class.shadow-border]="onlyShadowBorder()"
       [class.always-shadow]="alwaysDropShadow()"
+      [class.compact]="compact()"
     >
       <div class="background" [class.active]="open()"></div>
       <div
@@ -34,7 +35,7 @@ import {
       </div>
       <div class="bottom-container">
         <div class="bottom" [class.open]="open()">
-          @for (item of resolvedItems(); track item) {
+          @for (item of displayedItems(); track item) {
             @if (editing()) {
               <input
                 type="text"
@@ -370,6 +371,37 @@ import {
           clip-path: inset(-6px -6px 0 -6px);
         }
       }
+
+      // Tighter footprint on mobile (the page selector). The shared defaults
+      // don't shrink on small screens — the chip stays a ~50px slab and the
+      // drawer rows sit ~50px apart — so here the chip is slimmed and the
+      // option list is pulled into a dense, left-aligned menu.
+      &.compact {
+        @media (max-width: $mobile-width) {
+          // Chip (the selected page): snug vertically, but keep the full
+          // horizontal inset so the name doesn't hug the card edge. The
+          // default ~50px slab is trimmed to ~35px here.
+          .top {
+            padding: var(--small-padding) var(--medium-padding);
+            min-height: 34px;
+          }
+
+          // Dropdown panel: a tight, left-aligned list. Short rows + a hair of
+          // gap pull the page names together — the global mobile button rule
+          // (forms.scss) otherwise pads each to 42px and centers its label.
+          // Selectors are nested through .bottom-container to out-specify the
+          // default .bottom / .option mobile rules (which sit at 0,3,0 / 0,4,0).
+          .bottom-container .bottom {
+            padding: var(--small-padding) var(--medium-padding);
+            gap: 2px;
+
+            .option {
+              justify-content: flex-start;
+              min-height: 30px;
+            }
+          }
+        }
+      }
     }
   `,
 })
@@ -383,6 +415,8 @@ export class SelectAddComponent {
   readonly placeholder = input<string>('Select…');
   readonly alwaysDropShadow = input<boolean>(false);
   readonly onlyShadowBorder = input<boolean>(false);
+  /** Trim the chip's padding/min-height on mobile (e.g. the page selector). */
+  readonly compact = input<boolean>(false);
 
   // ── Legacy compat API (used by pages.component.html until Agent B updates) ─
   /** @deprecated Use items instead */
@@ -410,6 +444,17 @@ export class SelectAddComponent {
     const newItems = this.items();
     const oldOptions = this.options();
     return newItems.length ? newItems : oldOptions;
+  }
+
+  /**
+   * The options shown in the drawer. Excludes the currently-selected value —
+   * re-picking what's already selected is a no-op, so it just adds noise.
+   * In rename mode we list everything so every item stays editable.
+   */
+  protected displayedItems(): string[] {
+    if (this.editing()) return this.resolvedItems();
+    const selected = this.resolvedSelected();
+    return this.resolvedItems().filter((item) => item !== selected);
   }
 
   protected resolvedSelected(): string | null {

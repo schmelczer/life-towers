@@ -57,17 +57,19 @@ export interface TowerSettingsResult {
       @include card();
       width: 66vw;
       max-width: 400px;
-      @media (max-width: $mobile-width) {
-        width: 88vw;
-        max-width: 88vw;
-        padding: var(--medium-padding);
-      }
       box-sizing: border-box;
       padding: var(--large-padding);
       padding-top: calc(var(--large-padding) + var(--medium-padding));
       position: relative;
       box-shadow: $shadow;
       display: block;
+
+      @media (max-width: $mobile-width) {
+        width: 88vw;
+        max-width: 88vw;
+        padding: var(--medium-padding);
+        padding-top: calc(var(--large-padding) + 2 * var(--medium-padding));
+      }
 
       .exit {
         position: absolute;

@@ -62,6 +62,7 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
       @for (b of blocks(); track b.id; let i = $index) {
         <div
           class="card"
+          [attr.data-block-id]="b.id"
           [class.active]="activeIdx() === i + 1"
           [class.near-active]="activeIdx() === i || activeIdx() === i + 2"
           role="button"
@@ -589,6 +590,8 @@ export class BlockEditComponent implements AfterViewInit {
   readonly blocks = input.required<Block[]>();
   readonly activeBlockId = input<string | null>(null);
   readonly tags = input<string[]>([]);
+  /** Tag to pre-select on the create card (the previous block's tag). */
+  readonly lastTag = input<string>('');
   readonly baseColor = input.required<HslColor>();
   /** Default for `is_done` on the create card. */
   readonly defaultDone = input<boolean>(true);
@@ -633,15 +636,17 @@ export class BlockEditComponent implements AfterViewInit {
       untracked(() => this.editedValues.set(m));
     });
 
-    // Seed the newValue tag from tags input on first run.
+    // Seed the newValue tag on first run: prefer the last tag the user picked
+    // in the create view, falling back to the tower's first tag.
     effect(() => {
       const t = this.tags();
+      const last = this.lastTag();
       untracked(() => {
         const cur = this.newValue();
         if (!cur.tag) {
           this.newValue.set({
             ...cur,
-            tag: t.length > 0 ? t[0] : '',
+            tag: last || (t.length > 0 ? t[0] : ''),
           });
         }
       });
@@ -659,14 +664,24 @@ export class BlockEditComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    const blocks = this.blocks();
+    const focusId = this.activeBlockId();
+    const focusIdx = focusId
+      ? Math.max(0, blocks.findIndex((b) => b.id === focusId))
+      : blocks.length;
     // Position scroll on the focused card (or the create card if none).
-    queueMicrotask(() => {
-      const blocks = this.blocks();
-      const focusId = this.activeBlockId();
-      const focusIdx = focusId
-        ? Math.max(0, blocks.findIndex((b) => b.id === focusId))
-        : blocks.length;
+    //
+    // Deferred to a rendered FRAME (not a microtask): the modal host is
+    // reparented to <body> during the same change-detection flush (see
+    // modal.component), and on WebKit the carousel's horizontal scroll range
+    // isn't established until the next layout after that reparent. A
+    // microtask-time scroll therefore clamps to 0, leaving the wrong card
+    // centered — then `adjustPosition` locks `activeIdx` onto it. One frame
+    // later the layout is settled and the scroll lands. We re-assert across two
+    // frames to also survive the focus-trap's initial focus scroll.
+    this.afterFrame(() => {
       this.scrollToChild(focusIdx + 1, false);
+      this.afterFrame(() => this.scrollToChild(focusIdx + 1, false));
     });
   }
 
@@ -858,27 +873,51 @@ export class BlockEditComponent implements AfterViewInit {
     if (!container) return;
     const card = container.children.item(idx) as HTMLElement | null;
     if (!card) return;
-    const left =
-      card.offsetLeft - (container.clientWidth - card.offsetWidth) / 2;
+    // Use live viewport rects (getBoundingClientRect) rather than offsetLeft:
+    // the carousel is position:static, so the cards' offsetParent is the
+    // fixed :host, and on mobile the carousel's 15px horizontal padding skews
+    // offsetLeft out of the scroll container's coordinate space — enough that
+    // the snap tips to a neighbour card. Rects are absolute, so the delta
+    // between the card's centre and the container's centre is exact on every
+    // engine and at any padding.
+    const containerRect = container.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const delta =
+      cardRect.left + cardRect.width / 2 - (containerRect.left + containerRect.width / 2);
+    const left = container.scrollLeft + delta;
     // 'instant' (not 'auto') is required: the carousel sets `scroll-behavior:
-    // smooth`, and 'auto' defers to that — so the initial open would *animate*
-    // a scroll across the whole strip to reach the target card (very visible on
-    // mobile, where the carousel can be thousands of px wide). Tap-to-navigate
-    // still passes smooth=true for the nice slide between cards.
+    // smooth`, and 'auto' (and a bare `scrollLeft =`) defer to it — so the jump
+    // would *animate*, and the 150ms `adjustPosition` would then read a
+    // mid-flight position and snap to a neighbour. 'instant' lands in one frame.
+    // Tap-to-navigate keeps smooth=true for the nice slide between cards.
     container.scrollTo({ left, behavior: smooth ? 'smooth' : 'instant' });
     this.activeIdx.set(idx);
+  }
+
+  /** Run `cb` after the next rendered frame (falls back to sync where rAF is
+   *  unavailable, e.g. SSR / unit tests). */
+  private afterFrame(cb: () => void): void {
+    if (typeof requestAnimationFrame !== 'function') {
+      cb();
+      return;
+    }
+    requestAnimationFrame(() => cb());
   }
 
   private adjustPosition(): void {
     const container = this.container()?.nativeElement;
     if (!container) return;
-    const center = container.scrollLeft + container.clientWidth / 2;
+    // Live viewport centre of the scroll viewport (see scrollToChild for why
+    // rects beat offsetLeft here).
+    const containerRect = container.getBoundingClientRect();
+    const center = containerRect.left + containerRect.width / 2;
     let nearestIdx = 1;
     let minDist = Infinity;
     // children[0] and children[last] are the placeholders — skip.
     for (let i = 1; i < container.children.length - 1; i++) {
       const child = container.children.item(i) as HTMLElement;
-      const c = child.offsetLeft + child.offsetWidth / 2;
+      const rect = child.getBoundingClientRect();
+      const c = rect.left + rect.width / 2;
       const d = Math.abs(c - center);
       if (d < minDist) {
         minDist = d;

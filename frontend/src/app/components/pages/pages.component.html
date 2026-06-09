@@ -2,6 +2,7 @@
   <lt-select-add
     [options]="pageNames()"
     [selectedIndex]="selectedPageIndex()"
+    [compact]="true"
     placeholder="Add a new page…"
     (selectionChange)="onSelectPage($event)"
     (add)="onAddPage($event)"

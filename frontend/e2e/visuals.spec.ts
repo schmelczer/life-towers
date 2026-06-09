@@ -200,9 +200,24 @@ test.describe('Life Towers visuals', () => {
     await page.waitForTimeout(1800);
     await page.screenshot({ path: 'visuals/14-mobile-populated.png', fullPage: true });
 
-    // Open the block-edit carousel for the first tower's first task.
-    await page.locator('lt-tasks .header').first().click();
-    await page.waitForTimeout(400);
+    // New-tower modal on mobile — the X button must not overlap the name input.
+    await page.locator('img[alt="Add tower"]').click();
+    await page.waitForSelector('section.modal.active');
+    await page.locator('input[placeholder="New tower"]').fill('A long tower name to test');
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: 'visuals/14b-mobile-new-tower-modal.png', fullPage: true });
+    await page.locator('lt-tower-settings .exit').click({ force: true });
+    await page.waitForSelector('section.modal', { state: 'detached' });
+    await page.waitForTimeout(350);
+
+    // Open the block-edit carousel for the first tower's first task. The sample
+    // page keeps tasks open (keep_tasks_open: true), so the accordion header is
+    // absent — only click it when present (i.e. on a collapsed accordion).
+    const tasksHeader = page.locator('lt-tasks .header').first();
+    if (await tasksHeader.count()) {
+      await tasksHeader.click();
+      await page.waitForTimeout(400);
+    }
     await page.locator('lt-tasks .task-description').first().click();
     await page.waitForSelector('section.modal.active');
     await page.waitForTimeout(400);
