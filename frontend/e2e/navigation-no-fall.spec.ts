@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Regression: navigating between pages must NOT replay the falling animation.
@@ -17,6 +18,10 @@ import { test, expect } from '@playwright/test';
  *
  * The two pages are seeded into the offline cache with DISJOINT date ranges
  * (destination strictly newer) — the precise condition that triggered the bug.
+ *
+ * All ids (and the token) are generated here in Node — `crypto.randomUUID()`
+ * throws inside the page on the CI origin (http://life-towers:8000), which is
+ * plain HTTP and therefore not a secure context.
  */
 test.describe('navigation does not replay the falling animation', () => {
   test('navigating to a newer-dated page keeps blocks at rest', async ({ page }) => {
@@ -24,38 +29,38 @@ test.describe('navigation does not replay the falling animation', () => {
     const HOUR = 3600;
     const DAY = 86400;
 
+    // baseAgeDays/spacingHrs place each page's done blocks in its own window.
+    const tower = (name: string, h: number, baseAgeDays: number) => ({
+      id: randomUUID(),
+      name,
+      base_color: { h, s: 0.7, l: 0.55 },
+      blocks: [
+        { id: randomUUID(), tag: 't', description: 'pending', is_done: false, difficulty: 2, created_at: nowSec },
+        ...Array.from({ length: 6 }, (_unused, i) => ({
+          id: randomUUID(),
+          tag: 't',
+          description: `done ${i}`,
+          is_done: true,
+          difficulty: 1 + (i % 3),
+          created_at: nowSec - baseAgeDays * DAY - (i + 1) * 6 * HOUR,
+        })),
+      ],
+    });
+    const mkPage = (name: string, h: number, baseAgeDays: number) => ({
+      id: randomUUID(),
+      name,
+      hide_create_tower_button: false,
+      keep_tasks_open: false,
+      default_date_from: null,
+      default_date_to: null,
+      towers: [tower(name + ' A', h, baseAgeDays), tower(name + ' B', h + 0.2, baseAgeDays)],
+    });
+    // Page 0 ("Older") is the post-reload default; "Newer" is strictly more recent.
+    const tree = { pages: [mkPage('Older', 0.05, 6), mkPage('Newer', 0.55, 1)] };
+    const token = randomUUID();
+
     await page.addInitScript(
-      ({ nowSec, HOUR, DAY }) => {
-        const uuid = () => (crypto as Crypto).randomUUID();
-        // baseAgeDays/spacingHrs place each page's done blocks in its own window.
-        const tower = (name: string, h: number, baseAgeDays: number) => ({
-          id: uuid(),
-          name,
-          base_color: { h, s: 0.7, l: 0.55 },
-          blocks: [
-            { id: uuid(), tag: 't', description: 'pending', is_done: false, difficulty: 2, created_at: nowSec },
-            ...Array.from({ length: 6 }, (_unused, i) => ({
-              id: uuid(),
-              tag: 't',
-              description: `done ${i}`,
-              is_done: true,
-              difficulty: 1 + (i % 3),
-              created_at: nowSec - baseAgeDays * DAY - (i + 1) * 6 * HOUR,
-            })),
-          ],
-        });
-        const mkPage = (name: string, h: number, baseAgeDays: number) => ({
-          id: uuid(),
-          name,
-          hide_create_tower_button: false,
-          keep_tasks_open: false,
-          default_date_from: null,
-          default_date_to: null,
-          towers: [tower(name + ' A', h, baseAgeDays), tower(name + ' B', h + 0.2, baseAgeDays)],
-        });
-        // Page 0 ("Older") is the post-reload default; "Newer" is strictly more recent.
-        const tree = { pages: [mkPage('Older', 0.05, 6), mkPage('Newer', 0.55, 1)] };
-        const token = uuid();
+      ({ tree, token }) => {
         localStorage.setItem('life-towers.token.v4', token);
         localStorage.setItem('life-towers.cache.v4.' + token, JSON.stringify(tree));
 
@@ -84,7 +89,7 @@ test.describe('navigation does not replay the falling animation', () => {
           true,
         );
       },
-      { nowSec, HOUR, DAY },
+      { tree, token },
     );
 
     await page.goto('/');
