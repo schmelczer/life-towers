@@ -83,6 +83,24 @@ export class PagesComponent implements OnDestroy {
     return pages[0] ?? null;
   });
 
+  /**
+   * The selected page as a 0-or-1 element list, so the template's
+   * `@for (… track page.id)` REBUILDS the `lt-page` subtree when the page *id*
+   * changes (navigation) but REUSES it on same-page edits (id unchanged).
+   *
+   * Recreating on navigation gives each page a fresh date-range slider + filter,
+   * exactly like a page reload. Without it, `lt-page` (and its slider) are reused
+   * across pages, so the previous page's stale `dateRange` is applied to the new
+   * page's towers on their very first render. When the new page's blocks fall
+   * outside that stale range they render out-of-range (ascending, off-screen) and
+   * then visibly "fall" into place a frame later when the slider corrects the
+   * range — the bug this guards against.
+   */
+  readonly selectedPageList = computed<Page[]>(() => {
+    const page = this.selectedPage();
+    return page ? [page] : [];
+  });
+
   readonly confirmDeletePageName = computed(() => {
     const id = this.confirmDeletePageId();
     if (!id) return '';

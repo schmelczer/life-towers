@@ -134,7 +134,7 @@ describe('decideFalls', () => {
       decideFalls({
         firstRender: true,
         animateInitialStack: false,
-        newIds: ['a', 'b', 'c'],
+        pendingFallIds: ['a', 'b', 'c'],
         restingVisibleIds: new Set(['a', 'b', 'c']),
       }),
     ).toEqual([]);
@@ -145,7 +145,7 @@ describe('decideFalls', () => {
       decideFalls({
         firstRender: true,
         animateInitialStack: true,
-        newIds: ['a', 'b'],
+        pendingFallIds: ['a', 'b'],
         restingVisibleIds: new Set(['a', 'b']),
       }),
     ).toEqual(['a', 'b']);
@@ -156,29 +156,47 @@ describe('decideFalls', () => {
       decideFalls({
         firstRender: false,
         animateInitialStack: false,
-        newIds: ['new-1'],
+        pendingFallIds: ['new-1'],
         restingVisibleIds: new Set(['old-1', 'old-2', 'new-1']),
       }),
     ).toEqual(['new-1']);
   });
 
-  it('does not fall a new block that is capped out of view or out of range', () => {
+  it('does not fall a pending block that is capped out of view or out of range', () => {
+    // Out of range / capped out ⇒ not resting-visible ⇒ stays pending, no fall
+    // THIS round. The caller keeps it in the accumulator so it falls later.
     expect(
       decideFalls({
         firstRender: false,
         animateInitialStack: false,
-        newIds: ['new-hidden'],
+        pendingFallIds: ['new-hidden'],
         restingVisibleIds: new Set(['old-1', 'old-2']),
       }),
     ).toEqual([]);
   });
 
-  it('falls nothing when no ids are new (e.g. a date-range reshuffle)', () => {
+  it('falls a still-pending arrival on the LATER reconcile that brings it to rest', () => {
+    // Regression: ticking with the date-slider live runs two reconciles. The
+    // first sees the block out of range (it can't fall — see the case above);
+    // the second, after the slider snaps the range wider, brings it to rest.
+    // Because the id is still pending (not a one-shot "new this round" diff), it
+    // falls now instead of appearing instantly as a static square.
     expect(
       decideFalls({
         firstRender: false,
         animateInitialStack: false,
-        newIds: [],
+        pendingFallIds: ['ticked'],
+        restingVisibleIds: new Set(['old-1', 'ticked']),
+      }),
+    ).toEqual(['ticked']);
+  });
+
+  it('falls nothing when nothing is pending (e.g. a date-range reshuffle of settled blocks)', () => {
+    expect(
+      decideFalls({
+        firstRender: false,
+        animateInitialStack: false,
+        pendingFallIds: [],
         restingVisibleIds: new Set(['old-1', 'old-2', 'old-3']),
       }),
     ).toEqual([]);

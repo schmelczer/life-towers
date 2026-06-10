@@ -140,6 +140,7 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
 
           <div class="bottom">
             <button (click)="onDelete(b.id); $event.stopPropagation()">Delete</button>
+            <button (click)="saveAndExit(b.id); $event.stopPropagation()">Save and exit</button>
           </div>
         </div>
       }
@@ -550,19 +551,25 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
       }
 
       .bottom {
-        height: 32px;
+        min-height: 32px;
         @media (max-width: $mobile-width) {
-          height: 24px;
+          min-height: 24px;
         }
-        position: relative;
+        display: flex;
+        align-items: center;
+        // Existing-block cards carry two buttons (Delete + Save and exit) —
+        // push them to opposite edges of the card. The create card has a single
+        // button, re-centered below.
+        justify-content: space-between;
+        gap: var(--medium-padding);
 
         button {
           margin: 0;
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform: translateY(-50%) translateX(-50%);
         }
+      }
+
+      &.create-card .bottom {
+        justify-content: center;
       }
 
       @media (max-width: $mobile-width) {
@@ -574,6 +581,7 @@ export function createDoneValue(defaultDone: boolean, currentDone: boolean, edit
 
         .bottom {
           min-height: 42px;
+          gap: var(--medium-padding);
 
           button {
             width: max-content;
@@ -781,6 +789,16 @@ export class BlockEditComponent implements AfterViewInit {
 
   onDelete(id: string): void {
     this.delete.emit(id);
+  }
+
+  /**
+   * Flush any pending edits for the card (notably the description, which is
+   * otherwise only saved on blur) and close the carousel — mirrors the create
+   * card's "Create and exit" affordance for the existing-block cards.
+   */
+  saveAndExit(id: string): void {
+    this.flushExisting(id);
+    this.close.emit();
   }
 
   // ── Create-card mutations ──────────────────────────────────────────────────

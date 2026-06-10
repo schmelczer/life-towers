@@ -116,7 +116,11 @@
     }
   }
 
-  .confirm-delete {
+  // Projected into <lt-modal>, which hoists itself to <body> (see
+  // modal.component) — that moves this content out of :host, so a :host-scoped
+  // selector no longer matches. @at-root drops the :host prefix; the
+  // [_ngcontent] encapsulation attribute still scopes it to this component.
+  @at-root .confirm-delete {
     @include card();
     width: 66vw;
     max-width: 500px;
@@ -152,7 +156,7 @@
 
     .confirm-buttons {
       display: flex;
-      justify-content: center;
+      justify-content: space-between;
       gap: var(--large-padding);
 
       button {

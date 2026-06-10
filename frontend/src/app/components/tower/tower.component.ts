@@ -7,6 +7,9 @@ import {
   computed,
   effect,
   untracked,
+  inject,
+  afterNextRender,
+  Injector,
   AfterViewInit,
   OnDestroy,
   ElementRef,
@@ -128,25 +131,35 @@ export function selectVisibleStyledBlocks(
  * The two guarantees the user asked for live here:
  *   - **No fall on page load.** The very first render of a tower's stack never
  *     animates (`firstRender` ⇒ []), except the deliberate example showcase.
- *   - **Always fall on add / tick.** After that first render, any block whose id
- *     is genuinely new this round (a ticked task, an added done block, or a
- *     remote add picked up over SSE) and is currently resting & visible falls.
+ *   - **Always fall on add / tick.** After that first render, any block that has
+ *     arrived but not yet fallen (`pendingFallIds` — a ticked task, an added
+ *     done block, or a remote add picked up over SSE) falls once it is resting
+ *     & visible.
  *
- * Date-range reshuffles never appear here: a block re-entering range keeps its
- * id (so it isn't "new"), and blocks flying out aren't resting (`restingVisibleIds`
- * only holds opacity-1 blocks).
+ * `pendingFallIds` is an ACCUMULATOR, not a single-round "new this round" diff:
+ * an arrival that can't fall yet (e.g. still out of the date range on the
+ * reconcile that first sees it) stays pending and falls on the later reconcile
+ * that brings it to rest. This is what makes ticking robust to the two-pass
+ * reconcile a tick triggers when the slider is live — the block change runs one
+ * pass with the stale range, then the slider's snap re-emits a wider range and
+ * runs a second. A per-round diff would consume the arrival in the first pass
+ * and lose the fall in that gap.
+ *
+ * Date-range *reshuffles* of already-fallen blocks never appear here: a block
+ * re-entering range keeps its id (so it isn't a fresh arrival), and blocks
+ * flying out aren't resting (`restingVisibleIds` only holds opacity-1 blocks).
  */
 export function decideFalls(opts: {
   firstRender: boolean;
   animateInitialStack: boolean;
-  newIds: readonly string[];
+  pendingFallIds: readonly string[];
   restingVisibleIds: ReadonlySet<string>;
 }): string[] {
-  const { firstRender, animateInitialStack, newIds, restingVisibleIds } = opts;
+  const { firstRender, animateInitialStack, pendingFallIds, restingVisibleIds } = opts;
   if (firstRender) {
     return animateInitialStack ? [...restingVisibleIds] : [];
   }
-  return newIds.filter((id) => restingVisibleIds.has(id));
+  return pendingFallIds.filter((id) => restingVisibleIds.has(id));
 }
 
 @Component({
@@ -585,12 +598,11 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
   readonly hiddenBlockCount = signal(0);
   readonly hoveredBlockId = signal<string | null>(null);
 
+  private readonly injector = inject(Injector);
   private readonly stackZone = viewChild<ElementRef<HTMLElement>>('stackZone');
   private readonly towerRoot = viewChild<ElementRef<HTMLElement>>('towerRoot');
   private readonly maxVisibleBlocks = signal<number | null>(null);
   private resizeObserver: ResizeObserver | null = null;
-  private destroyed = false;
-  private readonly animationFrames = new Set<number>();
 
   // ── Derived ────────────────────────────────────────────────────────────────
   /** Pending (not-done) blocks — fed to the tasks accordion. */
@@ -663,6 +675,11 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
 
   /** Done-block ids present at the previous reconcile — diffed to find arrivals. */
   private prevDoneIds = new Set<string>();
+  /** Ids that have arrived (ticked / added / synced) but haven't fallen yet.
+   *  An arrival lingers here until a reconcile renders it resting & visible —
+   *  surviving the extra reconcile a tick triggers via the slider's range snap,
+   *  which would otherwise consume its "newness" before it could fall. */
+  private pendingFallIds = new Set<string>();
   /** False until the stack has been rendered once; gates "no fall on load". */
   private hasRenderedStack = false;
   /** WAAPI fall animations in flight; cancelled on destroy. */
@@ -697,9 +714,6 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.destroyed = true;
-    for (const id of this.animationFrames) cancelAnimationFrame(id);
-    this.animationFrames.clear();
     for (const anim of this.runningAnimations) anim.cancel();
     this.runningAnimations.clear();
     this.resizeObserver?.disconnect();
@@ -759,6 +773,23 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
     const firstRender = !this.hasRenderedStack;
     const newIds = ids.filter((id) => !this.prevDoneIds.has(id));
 
+    // Maintain the pending-fall accumulator. On the first render the whole
+    // initial stack is suppressed (no load-fall), so nothing is pending.
+    // Afterwards every fresh arrival becomes pending and STAYS pending until a
+    // reconcile renders it at rest — so the extra reconcile a tick triggers
+    // (the block change runs once with the stale range, then the slider's range
+    // snap re-emits and runs a second) can't consume its "newness" before it
+    // ever rests & falls. Forget any pending id that's no longer done (deleted
+    // or un-ticked before it fell).
+    if (firstRender) {
+      this.pendingFallIds.clear();
+    } else {
+      for (const id of newIds) this.pendingFallIds.add(id);
+    }
+    for (const id of [...this.pendingFallIds]) {
+      if (!idSet.has(id)) this.pendingFallIds.delete(id);
+    }
+
     // Build the styled list: in-range blocks rest at the bottom; blocks past the
     // upper date bound fly up and out (declarative `.ascend` transition); blocks
     // below the lower bound drop out of the list instantly. In-range blocks carry
@@ -786,9 +817,13 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Reserve a visible slot for the newest just-added block so a capped stack
-    // still shows (and can fall) it.
-    const reserveId = !firstRender && newIds.length > 0 ? newIds[newIds.length - 1] : null;
+    // Reserve a visible slot for the newest still-pending arrival so a capped
+    // stack still shows (and can fall) it. Drawn from the accumulator, not just
+    // this round's new ids, so the slot survives the second reconcile of a tick.
+    const reserveId =
+      !firstRender && this.pendingFallIds.size > 0
+        ? (ids.filter((id) => this.pendingFallIds.has(id)).pop() ?? null)
+        : null;
     // Captured before the `_visibleBlocks.set` below — lets the cap keep
     // currently-shown blocks that are now flying out so their exit animates.
     const prevVisibleIds = new Set(this._visibleBlocks().map((b) => b.id));
@@ -805,7 +840,14 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
       visibleStyled.filter((b) => b._opacity === '1').map((b) => b.id),
     );
 
-    const toFall = decideFalls({ firstRender, animateInitialStack, newIds, restingVisibleIds });
+    const toFall = decideFalls({
+      firstRender,
+      animateInitialStack,
+      pendingFallIds: [...this.pendingFallIds],
+      restingVisibleIds,
+    });
+    // These are falling now — they're no longer awaiting a resting render.
+    for (const id of toFall) this.pendingFallIds.delete(id);
 
     this.prevDoneIds = idSet;
     this.hasRenderedStack = true;
@@ -834,30 +876,34 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
 
   /**
    * Play the gravity "fall" on the given blocks' square elements via the Web
-   * Animations API, after they've rendered at their resting position. WAAPI
-   * animates the elements in from above on the next frame regardless of
-   * change-detection timing, so the fall always fires (the old approach flipped
-   * a CSS class across two rAFs and would intermittently drop the animation).
+   * Animations API.
+   *
+   * Scheduled with `afterNextRender`, which fires after Angular has committed
+   * the reconcile's DOM but BEFORE the browser paints. That ordering is the
+   * whole point: the square is rendered at its resting position, and the fall
+   * (which starts off-screen via `playFall`'s `fill: 'backwards'`) is installed
+   * in the same frame before paint — so the resting square never flashes for a
+   * frame before falling. A bare `requestAnimationFrame` can instead land a
+   * frame after change detection has already painted the block at rest, which
+   * is exactly the "dropped square appears for a split second, then jumps up and
+   * falls" glitch this avoids. WAAPI is still the right tool for the animation
+   * itself: it's immune to change-detection timing once started.
+   *
+   * Because the hook runs after the reconcile's render, every id in `blockIds`
+   * is in the DOM by now — no retry/poll, which would only mask a broken timing
+   * contract (and reintroduce the flash).
    */
-  private scheduleFall(blockIds: string[], attempt = 0): void {
-    this.requestFrame(() => {
-      if (this.destroyed) return;
-      const zone = this.stackZone()?.nativeElement;
-      if (!zone) return;
-      const pending: string[] = [];
-      for (const id of blockIds) {
-        const selector = `lt-block[data-block-id="${this.cssEscape(id)}"]`;
-        const els = zone.querySelectorAll<HTMLElement>(selector);
-        if (els.length === 0) {
-          // The block hasn't rendered yet (change detection can land a frame
-          // late); retry a couple of frames before giving up.
-          pending.push(id);
-          continue;
+  private scheduleFall(blockIds: string[]): void {
+    afterNextRender(
+      () => {
+        const zone = this.stackZone()!.nativeElement;
+        for (const id of blockIds) {
+          const selector = `lt-block[data-block-id="${this.cssEscape(id)}"]`;
+          zone.querySelectorAll<HTMLElement>(selector).forEach((el) => this.playFall(el));
         }
-        els.forEach((el) => this.playFall(el));
-      }
-      if (pending.length > 0 && attempt < 3) this.scheduleFall(pending, attempt + 1);
-    });
+      },
+      { injector: this.injector },
+    );
   }
 
   private playFall(el: HTMLElement): void {
@@ -886,18 +932,6 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
       return CSS.escape(value);
     }
     return value.replace(/["\\]/g, '\\$&');
-  }
-
-  private requestFrame(callback: () => void): void {
-    if (typeof requestAnimationFrame !== 'function') {
-      callback();
-      return;
-    }
-    const id = requestAnimationFrame(() => {
-      this.animationFrames.delete(id);
-      if (!this.destroyed) callback();
-    });
-    this.animationFrames.add(id);
   }
 
   // ── Event handlers ─────────────────────────────────────────────────────────

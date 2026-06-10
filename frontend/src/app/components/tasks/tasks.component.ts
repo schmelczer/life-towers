@@ -208,11 +208,21 @@ export function taskListMaxHeight(expanded: boolean): string {
                 transition: opacity $short-animation-time, transform $short-animation-time;
               }
 
-              &:hover,
+              // Reveal on hover only on real hover-capable pointers. On touch,
+              // :hover sticks to whatever ends up under the finger after the
+              // tapped task is removed — the next task slides up and would show
+              // its ✓. Keyboard focus + the genuine press still reveal it.
               &:focus-visible {
                 box-shadow: $shadow;
                 transform: scale(1.05);
                 &::after { opacity: 0.85; }
+              }
+              @media (hover: hover) and (pointer: fine) {
+                &:hover {
+                  box-shadow: $shadow;
+                  transform: scale(1.05);
+                  &::after { opacity: 0.85; }
+                }
               }
               &:active {
                 transform: scale(0.95);

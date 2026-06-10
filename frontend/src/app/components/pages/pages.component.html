@@ -10,13 +10,16 @@
 </div>
 
 <div class="page-container">
-  @if (selectedPage(); as page) {
+  <!-- 0-or-1 element @for keyed by page.id: rebuilds the page (fresh date-range
+       slider/filter) on navigation, reuses it on same-page edits. See
+       PagesComponent.selectedPageList. -->
+  @for (page of selectedPageList(); track page.id) {
     <lt-page
       [page]="page"
       [animateInitialStack]="page.id === animateInitialStackPageId()"
       (dragHappening)="dragHappening.set($event)"
     />
-  } @else {
+  } @empty {
     <p>Add a new page to get started!</p>
   }
 </div>
