@@ -93,6 +93,6 @@ docker compose -f docker-compose.dev.yml down -v
 
 ## Deployment
 
-Forgejo CI (`.forgejo/workflows/ci.yml`) tests the backend, frontend, production build, and Playwright e2e flow on every push to `master`.
+Forgejo CI (`.forgejo/workflows/ci.yml`) tests the backend, frontend, production build, and Playwright e2e flow on every push to `main`.
 
-The Docker workflow (`.forgejo/workflows/docker.yml`) builds and pushes images tagged `latest` and `sha-<commit>` on pushes to `master` or manual dispatch. It publishes to `vars.REGISTRY` (default `ghcr.io`) under the repository name, using `secrets.GITHUB_TOKEN` for registry auth.
+The Docker workflow (`.forgejo/workflows/docker.yml`) builds and pushes images tagged `latest` and `sha-<commit>` on pushes to `main` or manual dispatch. It publishes to `vars.REGISTRY` (default `ghcr.io`) under the repository name, using `secrets.GITHUB_TOKEN` for registry auth.
