@@ -12,7 +12,7 @@
     "lint": "ng lint"
   },
   "private": true,
-  "packageManager": "npm@10.9.2",
+  "packageManager": "npm@10.9.9",
   "dependencies": {
     "@angular/cdk": "^21.2.13",
     "@plausible-analytics/tracker": "^0.4.5",
