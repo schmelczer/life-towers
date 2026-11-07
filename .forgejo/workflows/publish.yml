@@ -25,9 +25,9 @@ jobs:
           # the service-worker manifest. Change this if the deploy path changes.
           build-args: |
             BASE_HREF=/towers/
-          token: ${{ !(github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/')
-            || startsWith(github.head_ref, 'renovate/')) && (secrets.FORGEJO_PACKAGE_TOKEN) || '' }}
-          push: ${{ !(github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/') ||
-            startsWith(github.head_ref, 'renovate/')) && (true) }}
+          token: ${{ !github.event.pull_request && (!(github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref,
+            'refs/heads/renovate/') || startsWith(github.head_ref, 'renovate/')) && (true)) && secrets.FORGEJO_PACKAGE_TOKEN || '' }}
+          push: ${{ !github.event.pull_request && (!(github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref,
+            'refs/heads/renovate/') || startsWith(github.head_ref, 'renovate/')) && (true)) }}
     if: ${{ contains(fromJSON('["andras","ruby336688","renovate-bot"]'), github.actor) && (!github.event.pull_request || contains(fromJSON('["andras","ruby336688","renovate-bot"]'),
       github.event.pull_request.user.login)) }}
