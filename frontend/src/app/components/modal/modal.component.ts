@@ -95,12 +95,10 @@ export class ModalComponent implements AfterViewInit, OnDestroy {
   readonly active = signal(false);
 
   private readonly dialogRef = viewChild<ElementRef<HTMLElement>>('dialog');
-  private previousFocus: HTMLElement | null = null;
   private readonly modalState = inject(ModalStateService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   ngAfterViewInit(): void {
-    this.previousFocus = document.activeElement as HTMLElement;
     // Track open state so towers can be locked while any modal is mounted.
     this.modalState.open();
     // Hoist the modal to <body> so its position:fixed references the viewport.
@@ -118,7 +116,7 @@ export class ModalComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.modalState.close();
-    this.previousFocus?.focus();
+    // cdkTrapFocusAutoCapture restores the element that opened the modal.
   }
 
   onBackdropClick(event: MouseEvent): void {

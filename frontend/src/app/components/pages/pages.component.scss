@@ -10,6 +10,15 @@
 
   @include inner-spacing(var(--large-padding));
 
+  .recovery-reminder {
+    margin: 0;
+    padding: var(--small-padding);
+    text-align: center;
+    font-size: var(--medium-font-size);
+    background: rgba($accent-color, 0.1);
+    border-radius: var(--border-radius);
+  }
+
   .select-add-container {
     width: 250px;
     margin: 0 auto;

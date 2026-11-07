@@ -1,75 +1,95 @@
-<div class="select-add-container">
-  <lt-select-add
-    [options]="pageNames()"
-    [selectedIndex]="selectedPageIndex()"
-    [compact]="true"
-    placeholder="Add a new page…"
-    (selectionChange)="onSelectPage($event)"
-    (add)="onAddPage($event)"
-  />
-</div>
-
-<div class="page-container">
-  <!-- 0-or-1 element @for keyed by page.id: rebuilds the page (fresh date-range
-       slider/filter) on navigation, reuses it on same-page edits. See
-       PagesComponent.selectedPageList. -->
-  @for (page of selectedPageList(); track page.id) {
-    <lt-page
-      [page]="page"
-      [animateInitialStack]="page.id === animateInitialStackPageId()"
-      (dragHappening)="dragHappening.set($event)"
-    />
-  } @empty {
-    <p>Add a new page to get started!</p>
-  }
-</div>
-
-<button [class.transparent]="dragHappening()" (click)="showSettings.set(true)">
-  Settings
-</button>
-
-@if (showSettings()) {
-  <lt-modal (close)="showSettings.set(false)">
+@if (store.recoveryRequired()) {
+  <lt-modal labelledBy="settings-title" describedBy="recovery-warning">
     <lt-settings
       [token]="store.token()"
-      [page]="selectedPage()"
-      (close)="showSettings.set(false)"
-      (updatePage)="onUpdatePage($event)"
-      (deletePage)="onRequestRemovePage()"
+      [requireRecovery]="true"
+      (recoveryAcknowledged)="store.acknowledgeRecoveryToken($event)"
       (switchAccount)="onSwitchAccount($event)"
     />
   </lt-modal>
-}
-
-@if (confirmDeletePageId()) {
-  <lt-modal (close)="cancelRemovePage()">
-    <div class="confirm-delete">
-      <div class="header">
-        <button class="exit" type="button" (click)="cancelRemovePage()" aria-label="Cancel"></button>
-        <h2>Delete page</h2>
-      </div>
-      <p>
-        Delete <strong>{{ confirmDeletePageName() || 'this page' }}</strong> and all of its towers and blocks?
-        This can't be undone.
-      </p>
-      <div class="confirm-buttons">
-        <button type="button" (click)="cancelRemovePage()">Cancel</button>
-        <button type="button" class="danger" (click)="confirmRemovePage()">Delete page</button>
-      </div>
-    </div>
-  </lt-modal>
-}
-
-@if (showWelcome()) {
-  <lt-modal
-    labelledBy="welcome-title"
-    describedBy="welcome-description"
-    (close)="showWelcome.set(false)"
-  >
-    <lt-welcome
-      (close)="showWelcome.set(false)"
-      (startFresh)="showWelcome.set(false)"
-      (loadExample)="onLoadExample()"
+} @else {
+  @if (store.token() && !store.tokenPersisted()) {
+    <p class="recovery-reminder" role="status">
+      Your browser cannot remember this account. After every reload, use your saved recovery token
+      to reopen it.
+    </p>
+  }
+  <div class="select-add-container">
+    <lt-select-add
+      [options]="pageNames()"
+      [selectedIndex]="selectedPageIndex()"
+      [compact]="true"
+      placeholder="Add a new page…"
+      (selectionChange)="onSelectPage($event)"
+      (add)="onAddPage($event)"
     />
-  </lt-modal>
+  </div>
+
+  <div class="page-container">
+    <!-- 0-or-1 element @for keyed by page.id: rebuilds the page (fresh date-range
+       slider/filter) on navigation, reuses it on same-page edits. See
+       PagesComponent.selectedPageList. -->
+    @for (page of selectedPageList(); track page.id) {
+      <lt-page
+        [page]="page"
+        [animateInitialStack]="page.id === animateInitialStackPageId()"
+        (dragHappening)="dragHappening.set($event)"
+      />
+    } @empty {
+      <p>Add a new page to get started!</p>
+    }
+  </div>
+
+  <button [class.transparent]="dragHappening()" (click)="showSettings.set(true)">Settings</button>
+
+  @if (showSettings()) {
+    <lt-modal (close)="showSettings.set(false)">
+      <lt-settings
+        [token]="store.token()"
+        [page]="selectedPage()"
+        (close)="showSettings.set(false)"
+        (updatePage)="onUpdatePage($event)"
+        (deletePage)="onRequestRemovePage()"
+        (switchAccount)="onSwitchAccount($event)"
+      />
+    </lt-modal>
+  }
+
+  @if (confirmDeletePageId()) {
+    <lt-modal (close)="cancelRemovePage()">
+      <div class="confirm-delete">
+        <div class="header">
+          <button
+            class="exit"
+            type="button"
+            (click)="cancelRemovePage()"
+            aria-label="Cancel"
+          ></button>
+          <h2>Delete page</h2>
+        </div>
+        <p>
+          Delete <strong>{{ confirmDeletePageName() || 'this page' }}</strong> and all of its towers
+          and blocks? This can't be undone.
+        </p>
+        <div class="confirm-buttons">
+          <button type="button" (click)="cancelRemovePage()">Cancel</button>
+          <button type="button" class="danger" (click)="confirmRemovePage()">Delete page</button>
+        </div>
+      </div>
+    </lt-modal>
+  }
+
+  @if (showWelcome()) {
+    <lt-modal
+      labelledBy="welcome-title"
+      describedBy="welcome-description"
+      (close)="showWelcome.set(false)"
+    >
+      <lt-welcome
+        (close)="showWelcome.set(false)"
+        (startFresh)="showWelcome.set(false)"
+        (loadExample)="onLoadExample()"
+      />
+    </lt-modal>
+  }
 }

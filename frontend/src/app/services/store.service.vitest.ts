@@ -9,10 +9,13 @@ import type { TreeDto } from '../models';
 // ── localStorage stub ────────────────────────────────────────────────────────
 const storage: Record<string, string> = {};
 let storageThrowsOnSet = false;
+let storageThrowsOnAccess = false;
+let storageDropsWrites = false;
 const localStorageStub = {
   getItem: (k: string) => storage[k] ?? null,
   setItem: (k: string, v: string) => {
     if (storageThrowsOnSet) throw new Error('QuotaExceededError');
+    if (storageDropsWrites) return;
     storage[k] = v;
   },
   removeItem: (k: string) => {
@@ -25,9 +28,11 @@ const localStorageStub = {
   },
 };
 Object.defineProperty(globalThis, 'localStorage', {
-  value: localStorageStub,
+  get: () => {
+    if (storageThrowsOnAccess) throw new Error('SecurityError');
+    return localStorageStub;
+  },
   configurable: true,
-  writable: true,
 });
 
 // ── crypto stub for tests that need deterministic UUIDs ─────────────────────
@@ -138,6 +143,8 @@ describe('StoreService', () => {
   beforeEach(() => {
     localStorageStub.clear();
     storageThrowsOnSet = false;
+    storageThrowsOnAccess = false;
+    storageDropsWrites = false;
     vi.useFakeTimers();
   });
   afterEach(() => {
@@ -158,6 +165,8 @@ describe('StoreService', () => {
     expect(api.register).toHaveBeenCalledWith(FIXED_UUID);
     expect(api.getData).toHaveBeenCalledWith(FIXED_UUID);
     expect(store.loading()).toBe(false);
+    expect(store.tokenPersisted()).toBe(true);
+    expect(store.recoveryRequired()).toBe(false);
   });
 
   it('reuses an existing stored token without re-registering', async () => {
@@ -247,6 +256,97 @@ describe('StoreService', () => {
       await expect(store.init()).resolves.toBeUndefined();
     });
     expect(store.loading()).toBe(false);
+    expect(store.recoveryRequired()).toBe(true);
+  });
+
+  it.each(['getter throws', 'write throws', 'write ignored'])(
+    'requires recovery acknowledgement before saving when storage %s', async (fault) => {
+      storageThrowsOnAccess = fault === 'getter throws';
+      storageThrowsOnSet = fault === 'write throws';
+      storageDropsWrites = fault === 'write ignored';
+      const api = makeMockApi();
+      const store = configure(api);
+      await withFixedUuid(FIXED_UUID, () => store.init());
+
+      expect(store.tokenPersisted()).toBe(false);
+      expect(store.recoveryRequired()).toBe(true);
+      store.addPage('Recoverable page');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(api.putData).not.toHaveBeenCalled();
+      expect(store.saveStatus()).not.toBe('saved');
+
+      store.acknowledgeRecoveryToken(OTHER_TOKEN);
+      expect(store.recoveryRequired()).toBe(true);
+      store.acknowledgeRecoveryToken(FIXED_UUID);
+      await vi.advanceTimersByTimeAsync(750);
+
+      expect(store.recoveryRequired()).toBe(false);
+      expect(store.tokenPersisted()).toBe(false);
+      expect(api.putData).toHaveBeenCalledWith(
+        FIXED_UUID, { pages: store.pages() }, 0,
+      );
+      expect(store.saveStatus()).toBe('saved');
+    },
+  );
+
+  it('keeps the in-memory account when init repeats without persistent storage', async () => {
+    storageThrowsOnAccess = true;
+    const api = makeMockApi();
+    const store = configure(api);
+    await withFixedUuid(FIXED_UUID, () => store.init());
+    store.acknowledgeRecoveryToken(FIXED_UUID);
+
+    await withFixedUuid(OTHER_TOKEN, () => store.init());
+
+    expect(store.token()).toBe(FIXED_UUID);
+    expect(api.register).toHaveBeenCalledTimes(1);
+    expect(store.recoveryRequired()).toBe(false);
+  });
+
+  it('requires recovery if token persistence fails during an ordinary session', async () => {
+    const api = makeMockApi();
+    const store = configure(api);
+    await store.init();
+    storageThrowsOnAccess = true;
+
+    store.addPage('Pending');
+    await vi.advanceTimersByTimeAsync(750);
+
+    expect(store.recoveryRequired()).toBe(true);
+    expect(api.putData).not.toHaveBeenCalled();
+
+    storageThrowsOnAccess = false;
+    store.updatePage(store.pages()[0].id, { name: 'Storage restored' });
+    await vi.advanceTimersByTimeAsync(750);
+
+    expect(store.tokenPersisted()).toBe(true);
+    expect(store.recoveryRequired()).toBe(false);
+    expect(api.putData).toHaveBeenCalledTimes(1);
+  });
+
+  it('pauses an in-flight save retry if storage becomes unavailable until recovery is acknowledged', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    api.putData.mockRejectedValueOnce(httpError(429, { 'Retry-After': '2' }));
+    const store = configure(api);
+    await store.init();
+    store.addPage('Initial edit');
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(1);
+
+    storageThrowsOnAccess = true;
+    store.updatePage(store.pages()[0].id, { name: 'Edit needing recovery' });
+    expect(store.recoveryRequired()).toBe(true);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(api.putData).toHaveBeenCalledTimes(1);
+
+    store.acknowledgeRecoveryToken(FIXED_UUID);
+    await vi.advanceTimersByTimeAsync(750);
+    expect(api.putData).toHaveBeenCalledTimes(2);
+    expect(api.putData).toHaveBeenLastCalledWith(
+      FIXED_UUID, { pages: store.pages() }, 0,
+    );
+    expect(store.saveStatus()).toBe('saved');
   });
 
   it('init() is single-flight — concurrent calls return the same promise', async () => {
@@ -571,6 +671,40 @@ describe('StoreService', () => {
   });
 
   // ── switchToken ───────────────────────────────────────────────────────────
+
+  it('restores the supplied token even if storage retains a different account', async () => {
+    storage[TOKEN_KEY] = FIXED_UUID;
+    const api = makeMockApi();
+    const store = configure(api);
+    await store.init();
+    storageThrowsOnSet = true;
+    api.getData.mockResolvedValue({ pages: [mkPage('Restored account')], revision: 1 });
+
+    store.switchToken(OTHER_TOKEN);
+    await flush();
+
+    expect(store.token()).toBe(OTHER_TOKEN);
+    expect(storage[TOKEN_KEY]).toBe(FIXED_UUID);
+    expect(api.getData).toHaveBeenLastCalledWith(OTHER_TOKEN);
+    expect(store.pages()[0].name).toBe('Restored account');
+    expect(store.recoveryRequired()).toBe(true);
+  });
+
+  it('requires a separate recovery acknowledgement for each switched account', async () => {
+    storageThrowsOnAccess = true;
+    const api = makeMockApi();
+    const store = configure(api);
+    await withFixedUuid(FIXED_UUID, () => store.init());
+    store.acknowledgeRecoveryToken(FIXED_UUID);
+
+    store.switchToken(OTHER_TOKEN);
+    await flush();
+    store.acknowledgeRecoveryToken(FIXED_UUID);
+
+    expect(store.recoveryRequired()).toBe(true);
+    store.acknowledgeRecoveryToken(OTHER_TOKEN);
+    expect(store.recoveryRequired()).toBe(false);
+  });
 
   it('switchToken cancels pending writes and does not flush old tree to new account', async () => {
     storage[TOKEN_KEY] = FIXED_UUID;

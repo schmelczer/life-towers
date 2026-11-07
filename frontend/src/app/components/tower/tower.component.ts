@@ -208,6 +208,7 @@ export function decideFalls(opts: {
           [style.--block-stack-height]="blockStackHeight()"
         >
           <img
+            #addBlockButton
             src="assets/plus-sign.svg"
             class="add-block"
             alt="Add block"
@@ -601,6 +602,7 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
   private readonly injector = inject(Injector);
   private readonly stackZone = viewChild<ElementRef<HTMLElement>>('stackZone');
   private readonly towerRoot = viewChild<ElementRef<HTMLElement>>('towerRoot');
+  private readonly addBlockButton = viewChild<ElementRef<HTMLElement>>('addBlockButton');
   private readonly maxVisibleBlocks = signal<number | null>(null);
   private resizeObserver: ResizeObserver | null = null;
 
@@ -991,6 +993,8 @@ export class TowerComponent implements AfterViewInit, OnDestroy {
 
   /** Called by the template "Add block" plus-icon. */
   openAddBlock(): void {
+    // Mouse/touch activation of the icon may not focus it automatically.
+    this.addBlockButton()?.nativeElement.focus({ preventScroll: true });
     this.editEntry.set(editEntryForNewBlock(this.keepTasksOpen()));
   }
 

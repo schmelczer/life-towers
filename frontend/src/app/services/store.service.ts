@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, OnDestroy } from '@angular/core';
+import { Injectable, computed, inject, signal, OnDestroy } from '@angular/core';
 import { ApiService } from './api.service';
 import { AnalyticsService } from './analytics.service';
 import { Page, Tower, Block, TreeDto, DataResponse, SaveStatus, HslColor } from '../models';
@@ -47,11 +47,12 @@ function safeGet(key: string): string | null {
     return null;
   }
 }
-function safeSet(key: string, value: string): void {
+function safeSet(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 function safeRemove(key: string): void {
@@ -100,12 +101,20 @@ export class StoreService implements OnDestroy {
   private readonly _pages = signal<Page[]>([]);
   private readonly _saveStatus = signal<SaveStatus>('idle');
   private readonly _token = signal<string>('');
+  private readonly _tokenPersisted = signal(false);
+  private readonly recoveryAcknowledgedToken = signal('');
   private readonly _loading = signal<boolean>(true);
 
   readonly pages = this._pages.asReadonly();
   readonly saveStatus = this._saveStatus.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly token = this._token.asReadonly();
+  readonly tokenPersisted = this._tokenPersisted.asReadonly();
+  readonly recoveryRequired = computed(
+    () =>
+      !!this._token() && !this._tokenPersisted() &&
+      this.recoveryAcknowledgedToken() !== this._token(),
+  );
 
   // ── Debounce / retry ───────────────────────────────────────────────────────
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -167,19 +176,18 @@ export class StoreService implements OnDestroy {
       window.addEventListener('storage', this.storageListener);
     }
 
-    let stored = safeGet(TOKEN_KEY);
+    // An explicit account switch must work even when storage cannot be written.
+    // Reuse the in-memory token on repeated init calls for the same reason.
+    let stored = this._token() || safeGet(TOKEN_KEY);
     if (stored && !isUuidV4(stored)) {
       // Garbage in localStorage from a buggy past version — refuse it.
       stored = null;
     } else if (stored) {
       stored = stored.toLowerCase();
-      safeSet(TOKEN_KEY, stored);
     }
     const token = stored ?? uuidV4();
-    if (!stored) {
-      safeSet(TOKEN_KEY, token);
-    }
     this._token.set(token);
+    this.persistToken(token);
 
     if (!stored) {
       try {
@@ -221,6 +229,18 @@ export class StoreService implements OnDestroy {
 
   private isCurrentInit(generation: number, token: string): boolean {
     return this.initGeneration === generation && this._token() === token;
+  }
+
+  private persistToken(token: string): void {
+    const written = safeSet(TOKEN_KEY, token);
+    // Read back too: storage shims may silently ignore writes.
+    this._tokenPersisted.set(written && safeGet(TOKEN_KEY)?.toLowerCase() === token);
+  }
+
+  acknowledgeRecoveryToken(token: string): void {
+    if (token !== this._token()) return;
+    this.recoveryAcknowledgedToken.set(token);
+    if (this.localMutationRevision > 0) this.scheduleSave();
   }
 
   /**
@@ -517,7 +537,8 @@ export class StoreService implements OnDestroy {
     this.sseReconnectAttempts = 0;
     this.initGeneration++;
     this.initPromise = null;
-    safeSet(TOKEN_KEY, token);
+    this.recoveryAcknowledgedToken.set('');
+    this._tokenPersisted.set(false);
     this._token.set(token);
     this._pages.set([]);
     this._loading.set(true);
@@ -532,7 +553,10 @@ export class StoreService implements OnDestroy {
   private scheduleSave(): void {
     this.localMutationRevision += 1;
     const token = this._token();
-    if (token) this.updateCache(token, { pages: this._pages() }, true);
+    if (token) {
+      this.persistToken(token);
+      this.updateCache(token, { pages: this._pages() }, true);
+    }
 
     if (this.flushInFlight) {
       // A save is already happening. Mark dirty so we re-flush when it finishes.
@@ -557,7 +581,7 @@ export class StoreService implements OnDestroy {
       return;
     }
     const token = this._token();
-    if (!token) return;
+    if (!token || this.recoveryRequired()) return;
 
     this.flushInFlight = true;
     this.dirtyDuringFlush = false;
@@ -582,6 +606,8 @@ export class StoreService implements OnDestroy {
   }
 
   private async attempt(put: PendingPut, attempt: number): Promise<void> {
+    // Storage may become unavailable while a retry is waiting.
+    if (this._token() !== put.token || this.recoveryRequired()) return;
     this._saveStatus.set(attempt === 0 ? 'saving' : 'retrying');
     try {
       const newRevision = await this.api.putData(put.token, put.tree, this.serverRevision);

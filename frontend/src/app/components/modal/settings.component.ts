@@ -23,8 +23,18 @@ export interface UpdatePagePayload {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="card">
-      <button class="exit" type="button" (click)="close.emit()" aria-label="Close"></button>
-      <h2>Settings</h2>
+      @if (!requireRecovery()) {
+        <button class="exit" type="button" (click)="close.emit()" aria-label="Close"></button>
+      }
+      <h2 id="settings-title">{{ requireRecovery() ? 'Save your recovery token' : 'Settings' }}</h2>
+
+      @if (requireRecovery()) {
+        <p class="recovery-warning" id="recovery-warning" role="alert">
+          Your browser cannot remember this account. After a reload, it may open a different,
+          empty account. Your saved pages stay on the server, but you need this recovery token
+          to access them again. Save it somewhere safe before continuing.
+        </p>
+      }
 
       @if (page()) {
         <section class="page-section">
@@ -69,7 +79,9 @@ export interface UpdatePagePayload {
       <section class="account-section">
         <h3>Account</h3>
 
-        <p class="hint">Copy this token to another device to permanently sync your progress</p>
+        <p class="hint">
+          Keep this token somewhere safe to reopen your account after a reload or on another device.
+        </p>
         <div class="token-row">
           <input
             type="text"
@@ -79,8 +91,33 @@ export interface UpdatePagePayload {
           />
           <button type="button" (click)="onCopy()">Copy</button>
         </div>
+        @if (copyStatus() === 'copied') {
+          <p class="hint" role="status">Token copied. Keep a copy somewhere safe.</p>
+        } @else if (copyStatus() === 'error') {
+          <p class="hint" role="alert">
+            Could not copy automatically. Select the token above and copy it manually.
+          </p>
+        }
 
-        <p class="hint">Paste a token to switch accounts</p>
+        @if (requireRecovery()) {
+          <label class="recovery-confirmation">
+            <input
+              type="checkbox"
+              [checked]="recoveryConfirmed()"
+              (change)="recoveryConfirmed.set($any($event.target).checked)"
+            />
+            I have saved this recovery token somewhere I can find after a reload.
+          </label>
+          <button
+            type="button"
+            [disabled]="!recoveryConfirmed()"
+            (click)="onAcknowledgeRecovery()"
+          >Continue saving</button>
+        }
+
+        <p class="hint">
+          {{ requireRecovery() ? 'Already have a recovery token? Paste it to reopen that account.' : 'Paste a token to switch accounts' }}
+        </p>
         <div class="token-row">
           <input
             type="text"
@@ -217,6 +254,20 @@ export interface UpdatePagePayload {
         }
       }
 
+      .recovery-confirmation {
+        @include medium-text();
+        display: flex;
+        align-items: flex-start;
+        gap: var(--small-padding);
+        line-height: 1.35;
+      }
+
+      .recovery-warning {
+        font-size: var(--medium-font-size);
+        line-height: 1.45;
+        margin: 0 0 var(--large-padding);
+      }
+
       input.error {
         box-shadow: 0 1px #b53f3f;
       }
@@ -240,10 +291,12 @@ export interface UpdatePagePayload {
 })
 export class SettingsComponent {
   readonly token = input.required<string>();
+  readonly requireRecovery = input(false);
   readonly page = input<Page | null>(null);
 
   readonly close = output<void>();
   readonly switchAccount = output<string>();
+  readonly recoveryAcknowledged = output<string>();
   readonly updatePage = output<UpdatePagePayload>();
   readonly deletePage = output<void>();
 
@@ -258,11 +311,18 @@ export class SettingsComponent {
   // Token-switch state
   readonly tokenInput = signal('');
   readonly tokenInputTouched = signal(false);
+  readonly copyStatus = signal<'idle' | 'copied' | 'error'>('idle');
+  readonly recoveryConfirmed = signal(false);
   readonly isValidToken = computed(() =>
     SettingsComponent.UUIDV4_RE.test(this.tokenInput()),
   );
 
   constructor() {
+    effect(() => {
+      this.token();
+      this.copyStatus.set('idle');
+      this.recoveryConfirmed.set(false);
+    });
     effect(() => {
       const p = this.page();
       if (p) {
@@ -302,8 +362,20 @@ export class SettingsComponent {
     });
   }
 
-  onCopy(): void {
-    navigator.clipboard.writeText(this.token()).catch(() => {});
+  async onCopy(): Promise<void> {
+    const token = this.token();
+    try {
+      await navigator.clipboard.writeText(token);
+      if (this.token() === token) this.copyStatus.set('copied');
+    } catch {
+      if (this.token() === token) this.copyStatus.set('error');
+    }
+  }
+
+  onAcknowledgeRecovery(): void {
+    if (this.requireRecovery() && this.recoveryConfirmed()) {
+      this.recoveryAcknowledged.emit(this.token());
+    }
   }
 
   onTokenInput(value: string): void {
