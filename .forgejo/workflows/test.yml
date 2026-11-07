@@ -9,13 +9,16 @@ on:
 jobs:
   backend:
     name: Backend tests
-    runs-on: docker
+    runs-on: ${{ (github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/') || startsWith(github.head_ref,
+      'renovate/')) && 'renovate' || 'docker' }}
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+        with:
+          persist-credentials: false
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -30,16 +33,20 @@ jobs:
       - name: Run pytest
         run: uv run pytest -v
 
-    if: ${{ github.actor != 'renovate-bot' && !startsWith(github.ref, 'refs/heads/renovate/') && !startsWith(github.head_ref, 'renovate/') }}
+    if: ${{ contains(fromJSON('["andras","ruby336688","renovate-bot"]'), github.actor) && (!github.event.pull_request || contains(fromJSON('["andras","ruby336688","renovate-bot"]'),
+      github.event.pull_request.user.login)) }}
   frontend-lint:
     name: Frontend lint
-    runs-on: docker
+    runs-on: ${{ (github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/') || startsWith(github.head_ref,
+      'renovate/')) && 'renovate' || 'docker' }}
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+        with:
+          persist-credentials: false
       - uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
@@ -52,16 +59,20 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
-    if: ${{ github.actor != 'renovate-bot' && !startsWith(github.ref, 'refs/heads/renovate/') && !startsWith(github.head_ref, 'renovate/') }}
+    if: ${{ contains(fromJSON('["andras","ruby336688","renovate-bot"]'), github.actor) && (!github.event.pull_request || contains(fromJSON('["andras","ruby336688","renovate-bot"]'),
+      github.event.pull_request.user.login)) }}
   frontend-test:
     name: Frontend unit tests
-    runs-on: docker
+    runs-on: ${{ (github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/') || startsWith(github.head_ref,
+      'renovate/')) && 'renovate' || 'docker' }}
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+        with:
+          persist-credentials: false
       - uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
@@ -74,16 +85,20 @@ jobs:
       - name: Run Vitest
         run: npm test
 
-    if: ${{ github.actor != 'renovate-bot' && !startsWith(github.ref, 'refs/heads/renovate/') && !startsWith(github.head_ref, 'renovate/') }}
+    if: ${{ contains(fromJSON('["andras","ruby336688","renovate-bot"]'), github.actor) && (!github.event.pull_request || contains(fromJSON('["andras","ruby336688","renovate-bot"]'),
+      github.event.pull_request.user.login)) }}
   frontend-build:
     name: Frontend build
-    runs-on: docker
+    runs-on: ${{ (github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/') || startsWith(github.head_ref,
+      'renovate/')) && 'renovate' || 'docker' }}
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+        with:
+          persist-credentials: false
       - uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
@@ -96,14 +111,18 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
-    if: ${{ github.actor != 'renovate-bot' && !startsWith(github.ref, 'refs/heads/renovate/') && !startsWith(github.head_ref, 'renovate/') }}
+    if: ${{ contains(fromJSON('["andras","ruby336688","renovate-bot"]'), github.actor) && (!github.event.pull_request || contains(fromJSON('["andras","ruby336688","renovate-bot"]'),
+      github.event.pull_request.user.login)) }}
   e2e:
     name: Playwright e2e
-    runs-on: docker
+    runs-on: ${{ (github.actor == 'renovate-bot' || github.event.pull_request.user.login == 'renovate-bot' || startsWith(github.ref, 'refs/heads/renovate/') || startsWith(github.head_ref,
+      'renovate/')) && 'renovate' || 'docker' }}
     needs: [backend, frontend-build]
     steps:
       - uses: https://github.com/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+        with:
+          persist-credentials: false
       - name: Ensure Docker CLI
         run: |
           set -eux
@@ -192,4 +211,5 @@ jobs:
       - name: Tear down stack
         if: always()
         run: docker compose -p life-towers -f docker-compose.dev.yml down -v
-    if: ${{ github.actor != 'renovate-bot' && !startsWith(github.ref, 'refs/heads/renovate/') && !startsWith(github.head_ref, 'renovate/') }}
+    if: ${{ contains(fromJSON('["andras","ruby336688","renovate-bot"]'), github.actor) && (!github.event.pull_request || contains(fromJSON('["andras","ruby336688","renovate-bot"]'),
+      github.event.pull_request.user.login)) }}
