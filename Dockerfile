@@ -27,7 +27,7 @@ RUN npm run build -- --base-href="$BASE_HREF" \
        fi
 
 # Stage 2: runtime
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 # Runtime essentials:
 #   curl     — used by HEALTHCHECK
